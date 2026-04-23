@@ -133,11 +133,10 @@ def plot_error_distribution(errors, title: str = "预测误差分布") -> 'go.Fi
     errors = np.array(errors).flatten()
     fig = go.Figure(data=[
         go.Histogram(x=errors, nbinsx=50, marker_color='#2563eb',
-                     opacity=0.75, name='误差分布')
+                     opacity=0.75, name='误差分布', bargap=0.05)
     ])
     fig.update_layout(**_make_layout(title, height=350, margin_b=60,
                                      xaxis_title='误差百分比 (%)', yaxis_title='频次'))
-    fig.update_traces(bargap=0.05)
     return fig
 
 
