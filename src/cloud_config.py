@@ -32,3 +32,6 @@ def is_cloud_env() -> bool:
 
 DEMO_SYMBOLS = ['A0']
 CLOUD_AVAILABLE_SYMBOLS = []
+
+DEPLOY_VERSION = '2026-04-23T12:30:00'
+DEPLOY_NOTE = 'Streamlit Cloud auto-deploy trigger - pricing_model.py sync'
