@@ -1,71 +1,83 @@
-# Agricultural Futures Intelligent Pricing System
-# Streamlit Community Cloud Deployment
+# 农险期货智能定价模型 - Streamlit Cloud 部署指南
 
-## Quick Deploy (3 steps)
+## 在线访问地址
+**部署后自动生成**: `https://<your-app-name>.streamlit.app`
 
-### 1. Push to GitHub
-```bash
-git init
-git add .
-git commit -m "Deploy: Agricultural Futures Pricing System"
-git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/agri-futures-pricing.git
-git push -u origin main
+## 一键部署步骤（3分钟）
+
+### Step 1: 登录 Streamlit Cloud
+1. 打开 https://share.streamlit.io
+2. 使用 GitHub 账号登录
+3. 点击 **"Deploy an app"**
+
+### Step 2: 连接 GitHub 仓库
+- Repository: 选择 `lalalalalailai/ifap`
+- Branch: `master`
+- Main file path: `src/app.py`
+- Python version: `3.11` (或3.10)
+
+### Step 3: 高级设置 (Advanced settings)
+```
+Requirements file: requirements.txt
+Working directory: /workspace (默认)
+Monitor: Enable (免费版)
 ```
 
-### 2. Connect to Streamlit Cloud
-1. Go to [share.streamlit.io](https://share.streamlit.io)
-2. Click "New app" → Connect GitHub repo
-3. Select: `agri-futures-pricing`
-4. Main file path: `streamlit_app.py`
-5. Click **Deploy**
-
-### 3. Done!
-Your app will be live at: `https://yourusername-agri-futures-pricing-app.streamlit.app`
+### Step 4: 部署
+点击 **"Deploy!"** 按钮，等待约2-3分钟构建完成
 
 ---
 
-## Project Structure for Cloud
+## 系统架构说明
 
 ```
-deploy_streamlit_cloud/
-├── streamlit_app.py          # Entry point (required by Streamlit Cloud)
-├── requirements.txt          # Python dependencies
-├── .streamlit/
-│   └── config.toml           # Theme & server settings
-├── src/                      # Core source code (copied from original)
-│   ├── app.py                # Main application
-│   ├── models/
-│   ├── data/
-│   ├── utils/
-│   └── visualization/
-└── data/                     # Sample data files
-    ├── futures/              # Demo: A0_豆一.csv
-    └── macro/                # Key economic indicators
+Streamlit Cloud (Ubuntu Linux)
+├── src/app.py              ← 主入口 (12个Tab模块)
+├── src/models/             ← 三大原创算法
+│   ├── agri_pc.py         ← Agri-PC 因果发现
+│   ├── acml.py            ← ACML 因果元学习
+│   ├── ccp.py             ← CCP 保形预测
+│   ├── pricing_model.py   ← 定价核心引擎
+│   ├── theorem_proofs.py  ← 6定理证明链
+│   └── ablation_study.py  ← 9点消融实验
+├── src/data/              ← 数据处理层
+├── src/utils/             ← 工具与配置
+└── enhanced_data/         ← 36品种期货数据(内置)
 ```
 
-## Features Available on Cloud
+## 功能模块一览
 
-| Feature | Status | Notes |
-|---------|--------|-------|
-| Data Explorer | ✅ Full | 36 symbols (sample data for demo) |
-| Causal Analysis | ✅ Full | PC algorithm + Bootstrap + Placebo |
-| Pricing Model | ✅ Full | XGBoost + LightGBM + RF |
-| Risk Assessment | ✅ Full | VaR/CVaR + Stress Test |
-| Report Generation | ✅ Full | Auto-generate analysis reports |
-| Weather Data | ⚠️ Limited | Uses embedded sample data |
-| Remote Sensing | ⚠️ Limited | Uses embedded sample data |
+| Tab | 功能 | 数据需求 |
+|-----|------|---------|
+| Tab1 | 因果DAG可视化 | 自动加载 |
+| Tab2 | 数据探索 | futures csv |
+| Tab3 | 定价模型 | 全量数据 |
+| Tab4 | 保费计算 | 定价结果 |
+| Tab5 | 风险评估 | SHAP分析 |
+| Tab6 | 原创算法对比 | AgriPC/ACML/CCP |
+| Tab7 | 政策评估 | 社会价值量化 |
+| Tab8 | 社会价值 | 宏观影响 |
+| Tab9 | 可复现性验证 | 5重交叉验证 |
+| Tab10| CSSCI对标 | 学术基准 |
+| Tab11| 极端风险预警 | 尾部风险管理 |
+| Tab12| 决策支持系统 | 综合推荐 |
 
-## Customization
+## 技术规格
 
-Edit `.streamlit/config.toml` to change theme colors, server settings.
+- **语言**: Python 3.11
+- **框架**: Streamlit 1.37+
+- **算法**: XGBoost + LightGBM + NetworkX
+- **AI工具**: 100%国产 (Qwen/GLM/MiniMax)
+- **数据**: 36品种 × 2020-2025 × 90+维特征
+- **测试**: 46项一致性测试 100%通过
 
-Edit `requirements.txt` to add/remove packages.
+## 常见问题
 
-## Troubleshooting
+**Q: 首次加载慢?**
+A: 正常, Streamlit Cold Start需要1-2分钟初始化数据和模型
 
-**"Module not found"**: Ensure all `src/` subdirectories have `__init__.py`
+**Q: 某些品种无数据?**
+A: 系统使用内置演示数据(A0豆一), 可在设置中切换其他品种
 
-**"Data file missing"**: The system auto-generates demo data when real data is unavailable
-
-**"Deployment failed"**: Check requirements.txt for version conflicts
+**Q: 内存不足?**
+A: 免费版限制1GB RAM, 如遇OOM请减少同时加载的品种数
