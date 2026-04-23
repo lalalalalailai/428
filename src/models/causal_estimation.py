@@ -54,9 +54,9 @@ class PSMEstimator:
                 matches.append({
                     'treated_idx': int(t_idx),
                     'control_idx': int(c_idx),
-                    'distance': float(distances[i][j+1]),
-                    'pscore_treated': float(treated_pscores[i]),
-                    'pscore_control': float(control_pscores[indices[i][j+1]])
+                    'distance': float(np.asarray(distances[i][j+1]).item()),
+                    'pscore_treated': float(np.asarray(treated_pscores[i]).item()),
+                    'pscore_control': float(np.asarray(control_pscores[indices[i][j+1]]).item())
                 })
         matched_df = pd.DataFrame(matches)
         matched_treated = set(matched_df['treated_idx'].unique())

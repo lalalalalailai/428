@@ -1035,6 +1035,8 @@ def render_causal_analysis():
             df_est = df_features.copy()
             median_val = df_est[treatment_var].median()
             df_est['_treatment'] = (df_est[treatment_var] > median_val).astype(int)
+            psm_result = {'ate': 0, 'p_value': 1.0, 'significant': False,
+                          'n_treated': 0, 'n_control': 0, 'ci_lower': 0, 'ci_upper': 0}
             try:
                 psm_result = psm.fit(df_est[covariates + ['_treatment']], df_est['_treatment'], df_est[target_var])
                 st.success(f"✅ ATE={psm_result.get('ate', 0):.4f}, P={psm_result.get('p_value', 1):.4f} "
