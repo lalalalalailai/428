@@ -29,7 +29,10 @@ if SRC_DIR not in sys.path:
 if PARENT_DIR not in sys.path:
     sys.path.insert(0, PARENT_DIR)
 
-os.chdir(SRC_DIR)
+try:
+    os.chdir(SRC_DIR)
+except OSError:
+    pass
 
 from utils.config import config
 from utils.constants import CORE_SYMBOLS, SYMBOL_NAMES, PROVINCES, PRICING_CONFIG, DAG_CONFIG
