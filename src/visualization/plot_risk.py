@@ -150,4 +150,6 @@ def _placeholder(msg):
         class D:
             def show(self): print(msg)
         return D()
-    return go.Figure(layout=go.Layout(title=msg, template='plotly_white'))
+    fig = go.Figure()
+    fig.update_layout(title=msg, template='plotly_white')
+    return fig

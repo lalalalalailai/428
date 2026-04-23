@@ -103,7 +103,8 @@ def plot_causal_dag(nodes: List[str], edges: List[Tuple[str, str]],
                 bgcolor='rgba(248,250,252,0.85)'
             ))
     all_traces = edge_traces + [node_trace]
-    fig = go.Figure(data=all_traces, layout=go.Layout(
+    fig = go.Figure(data=all_traces)
+    fig.update_layout(
         title=dict(text=title, font=dict(size=18, color='#475569', family='Microsoft YaHei')),
         showlegend=False,
         template='plotly_white',
@@ -115,7 +116,7 @@ def plot_causal_dag(nodes: List[str], edges: List[Tuple[str, str]],
         margin=dict(l=50, r=50, t=80, b=50),
         height=550,
         hovermode='closest'
-    ))
+    )
     return fig
 
 
@@ -137,7 +138,8 @@ def plot_correlation_heatmap(df: pd.DataFrame,
         texttemplate='%{text}',
         textfont=dict(size=9),
         colorbar=dict(title="相关系数", thickness=15)
-    ), layout=go.Layout(
+    ))
+    fig.update_layout(
         title=dict(text=title, font=dict(size=16, color='#475569', family='Microsoft YaHei')),
         template='plotly_white',
         paper_bgcolor='#f8fafc',
@@ -147,7 +149,7 @@ def plot_correlation_heatmap(df: pd.DataFrame,
         height=500,
         width=600,
         margin=dict(l=100, r=20, t=60, b=120)
-    ))
+    )
     return fig
 
 
@@ -156,8 +158,6 @@ def _placeholder_figure(message: str) -> 'go.Figure':
         class DummyFigure:
             def show(self): print(message)
         return DummyFigure()
-    return go.Figure(layout=go.Layout(
-        title=message,
-        template='plotly_white',
-        paper_bgcolor='#f8fafc'
-    ))
+    fig = go.Figure()
+    fig.update_layout(title=message, template='plotly_white', paper_bgcolor='#f8fafc')
+    return fig

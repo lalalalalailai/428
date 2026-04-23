@@ -12,6 +12,28 @@ from utils.helpers import logger_setup
 
 logger = logger_setup('plot_performance')
 
+def _make_layout(title: str, height: int = 400, margin_b: int = 100,
+                 xaxis_title: str = '', yaxis_title: str = '',
+                 showlegend: bool = False) -> dict:
+    layout_dict = {
+        'title': dict(text=title, font=dict(size=16, color='#475569', family='Microsoft YaHei')),
+        'template': 'plotly_white',
+        'paper_bgcolor': '#f8fafc',
+        'plot_bgcolor': '#ffffff',
+        'height': height,
+        'margin': dict(l=60, r=40, t=60, b=margin_b),
+        'xaxis': dict(gridcolor='#e2e8f0', tickfont=dict(color='#94a3b8', size=10)),
+        'yaxis': dict(gridcolor='#e2e8f0', tickfont=dict(color='#94a3b8'))
+    }
+    if xaxis_title:
+        layout_dict['xaxis']['title'] = xaxis_title
+    if yaxis_title:
+        layout_dict['yaxis']['title'] = yaxis_title
+    if showlegend:
+        layout_dict['legend'] = dict(font=dict(color='#475569'), orientation='h',
+                                      yanchor='bottom', y=1.02, xanchor='right', x=1)
+    return layout_dict
+
 def plot_model_performance(metrics: Dict[str, float],
                              title: str = "模型性能指标") -> 'go.Figure':
     if go is None:
@@ -36,16 +58,9 @@ def plot_model_performance(metrics: Dict[str, float],
         text=[f'{v:.4f}' if k != 'mape' else f'{v:.2f}%' for k, v in zip(keys, values)],
         textposition='outside',
         textfont=dict(color='#475569', size=11)
-    )], layout=go.Layout(
-        title=dict(text=title, font=dict(size=16, color='#475569', family='Microsoft YaHei')),
-        template='plotly_white',
-        paper_bgcolor='#f8fafc',
-        plot_bgcolor='#ffffff',
-        yaxis=dict(gridcolor='#e2e8f0', titlefont=dict(color='#475569')),
-        xaxis=dict(tickfont=dict(color='#94a3b8', size=10), tickangle=-30),
-        height=400,
-        margin=dict(l=60, r=40, t=60, b=100)
-    ))
+    )])
+    fig.update_layout(**_make_layout(title, height=400, margin_b=100))
+    fig.update_xaxes(tickangle=-30)
     return fig
 
 
@@ -107,16 +122,8 @@ def plot_feature_importance(feature_importance: pd.Series,
         text=[f'{v:.4f}' for v in fi_top.values],
         textposition='outside',
         textfont=dict(color='#475569', size=10)
-    )], layout=go.Layout(
-        title=dict(text=title, font=dict(size=16, color='#475569', family='Microsoft YaHei')),
-        template='plotly_white',
-        paper_bgcolor='#f8fafc',
-        plot_bgcolor='#ffffff',
-        xaxis=dict(gridcolor='#e2e8f0', tickfont=dict(color='#94a3b8')),
-        yaxis=dict(tickfont=dict(color='#94a3b8', size=10)),
-        height=max(350, top_n * 25),
-        margin=dict(l=150, r=40, t=60, b=40)
-    ))
+    )])
+    fig.update_layout(**_make_layout(title, height=max(350, top_n * 25), margin_b=40))
     return fig
 
 
@@ -127,17 +134,10 @@ def plot_error_distribution(errors, title: str = "预测误差分布") -> 'go.Fi
     fig = go.Figure(data=[
         go.Histogram(x=errors, nbinsx=50, marker_color='#2563eb',
                      opacity=0.75, name='误差分布')
-    ], layout=go.Layout(
-        title=dict(text=title, font=dict(size=16, color='#475569', family='Microsoft YaHei')),
-        template='plotly_white',
-        paper_bgcolor='#f8fafc',
-        plot_bgcolor='#f8fafc',
-        xaxis=dict(title='误差百分比 (%)', gridcolor='#e2e8f0'),
-        yaxis=dict(title='频次', gridcolor='#e2e8f0'),
-        bargap=0.05,
-        height=350,
-        margin=dict(l=60, r=40, t=60, b=60)
-    ))
+    ])
+    fig.update_layout(**_make_layout(title, height=350, margin_b=60,
+                                     xaxis_title='误差百分比 (%)', yaxis_title='频次'))
+    fig.update_traces(bargap=0.05)
     return fig
 
 
@@ -146,4 +146,6 @@ def _placeholder_fig(msg):
         class D:
             def show(self): print(msg)
         return D()
-    return go.Figure(layout=go.Layout(title=msg, template='plotly_white'))
+    fig = go.Figure()
+    fig.update_layout(title=msg, template='plotly_white')
+    return fig
