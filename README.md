@@ -1,20 +1,30 @@
 # 农险期货智能定价模型 - Streamlit Cloud 部署指南
 
-## 在线访问地址
-**部署后自动生成**: `https://<your-app-name>.streamlit.app`
+## 🌐 在线访问地址
+**当前已部署**: https://onbuhbzhqymxygdtvclsha.streamlit.app/
 
-## 一键部署步骤（3分钟）
+## 🚀 一键部署步骤（3分钟）
 
 ### Step 1: 登录 Streamlit Cloud
 1. 打开 https://share.streamlit.io
 2. 使用 GitHub 账号登录
 3. 点击 **"Deploy an app"**
 
-### Step 2: 连接 GitHub 仓库
-- Repository: 选择 `lalalalalailai/ifap`
-- Branch: `master`
-- Main file path: `src/app.py`
-- Python version: `3.11` (或3.10)
+### Step 2: 连接 GitHub 仓库 (⚠️ 关键配置)
+```
+Repository:    lalalalalailai/ifap
+Branch:        main                    ← 注意是 main 不是 master!
+Main file path: src/streamlit_app.py   ← 安全入口，防止1ST崩溃
+Python version: 3.11 (或3.10)
+```
+
+> **为什么用 streamlit_app.py?**
+> `app.py` 包含30+重型模块顶层import，在Streamlit Cloud的Linux环境下可能因缺少数据文件而崩溃(1ST错误)。
+> `streamlit_app.py` 是安全入口，具有：
+> - ✅ 最小化顶层import（仅streamlit + 标准库）
+> - ✅ 懒加载重型模块（延迟到用户交互时）
+> - ✅ 全链路异常捕获（展示友好错误信息）
+> - ✅ 降级演示模式（即使数据加载失败也能显示页面）
 
 ### Step 3: 高级设置 (Advanced settings)
 ```
