@@ -202,3 +202,55 @@ def _generate_report_summary(dm_results: Dict, white_result: Dict) -> str:
     lines.append(f"   W={white_result['w_statistic']:.6f}, p={white_result['p_value']:.4f} {passed}")
     lines.append(f"   {white_result['interpretation']}")
     return "\n".join(lines)
+
+
+def clark_west_test(y_true: np.ndarray,
+                    y_pred_model1: np.ndarray,
+                    y_pred_model2: np.ndarray,
+                    h: int = 1) -> Dict:
+    y_true = np.asarray(y_true).flatten()
+    e1 = y_true - np.asarray(y_pred_model1).flatten()
+    e2 = y_true - np.asarray(y_pred_model2).flatten()
+    min_len = min(len(e1), len(e2))
+    e1 = e1[:min_len]
+    e2 = e2[:min_len]
+    T = len(e1)
+    if T < 10:
+        return {'cw_statistic': 0.0, 'p_value': 1.0, 'significant': False,
+                'method': 'Clark-West', 'n_samples': T}
+    mse1 = np.mean(e1 ** 2)
+    mse2 = np.mean(e2 ** 2)
+    f_t = e2 ** 2 - e1 ** 2 + (e1 * e2) - (e1 ** 2)
+    f_bar = np.mean(f_t)
+    gamma_0 = np.var(f_t, ddof=0)
+    max_lag = min(h, T // 3)
+    gamma_sum = gamma_0
+    for lag in range(1, max_lag + 1):
+        if lag < T:
+            gamma_lag = np.cov(f_t[lag:], f_t[:-lag], ddof=0)[0, 1]
+            gamma_sum += 2 * gamma_lag
+    var_f_bar = gamma_sum / T
+    if var_f_bar < 1e-15:
+        var_f_bar = 1e-15
+    cw_stat = f_bar / np.sqrt(var_f_bar)
+    p_value = 1 - stats.norm.cdf(cw_stat)
+    sig = p_value < 0.05
+    interpretation = f"Clark-West检验{'极显著(p<0.01)' if p_value < 0.01 else '显著(p<0.05)' if p_value < 0.05 else '不显著(p≥0.05)'}，"
+    interpretation += f"模型1{'显著优于' if sig else '不显著优于'}模型2，CW={cw_stat:.4f}"
+    result = {
+        'cw_statistic': round(float(cw_stat), 4),
+        'p_value': round(float(p_value), 6),
+        'significant': sig,
+        'mse_model1': round(float(mse1), 6),
+        'mse_model2': round(float(mse2), 6),
+        'mse_diff': round(float(mse2 - mse1), 6),
+        'f_bar': round(float(f_bar), 6),
+        'var_f_bar': round(float(var_f_bar), 8),
+        'n_samples': T,
+        'h': h,
+        'method': 'Clark-West',
+        'interpretation': interpretation
+    }
+    logger.info(f"Clark-West检验: CW={cw_stat:.4f}, p={p_value:.6f}, "
+                f"{'显著' if sig else '不显著'}")
+    return result

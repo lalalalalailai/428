@@ -12,7 +12,7 @@
 
 ### Step 2: 连接 GitHub 仓库 (⚠️ 关键配置)
 ```
-Repository:    lalalalalailai/ifap
+Repository:    agri-insurance-pricing/ifap
 Branch:        main                    ← 注意是 main 不是 master!
 Main file path: src/streamlit_app.py   ← 安全入口，防止1ST崩溃
 Python version: 3.11 (或3.10)

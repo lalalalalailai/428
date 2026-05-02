@@ -8,7 +8,7 @@ C. 新增改进函数(pure_prediction/数据驱动系数/定理证明/消融实�
 D. 数据规模声明(36品种/53,058记录/12模块)与实际一致
 E. 系统文件完整性(start.bat/Dockerfile/docker-compose.yml等)
 
-Author: 农险期货智能定价模型研究团队
+Author: Team IFAP
 Date: 2026-04-23
 Version: v2.0 (扩充版研究报告一致性验证)
 """
@@ -22,8 +22,8 @@ import warnings
 
 warnings.filterwarnings('ignore')
 
-SRC_DIR = r"D:\智能化开发应用\2026四川大学生计算机竞赛\农险期货智能定价模型_最终提交\04_源码及说明\deploy_streamlit_cloud\src"
-REPORT_PATH = r"D:\智能化开发应用\2026四川大学生计算机竞赛\农险期货智能定价模型_最终提交\01_研究报告\研究报告_扩充终稿.docx"
+SRC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)))
+REPORT_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '..', '01_研究报告', '研究报告_扩充终稿.docx')
 
 if SRC_DIR not in sys.path:
     sys.path.insert(0, SRC_DIR)
@@ -197,7 +197,7 @@ class TestDataConsistency(unittest.TestCase):
     def test_pricing_config_exists(self):
         """PRICING_CONFIG配置完整"""
         from utils.constants import PRICING_CONFIG
-        required_keys = ['target_mape', 'achieved_mape_reference', 'cv_folds', 'market_size_billion']
+        required_keys = ['target_mape', 'achieved_mape_with_lag', 'cv_folds', 'market_size_billion']
         for key in required_keys:
             self.assertIn(key, PRICING_CONFIG, f"PRICING_CONFIG缺少{key}")
             
@@ -261,7 +261,7 @@ class TestResearchReportClaims(unittest.TestCase):
 class TestSystemFilesCompleteness(unittest.TestCase):
     """测试F: 提交包系统文件完整性"""
     
-    BASE_DIR = r"D:\智能化开发应用\2026四川大学生计算机竞赛\农险期货智能定价模型_最终提交"
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     
     def test_start_bat_exists(self):
         """start.bat一键启动脚本存在"""
@@ -295,7 +295,7 @@ class TestSystemFilesCompleteness(unittest.TestCase):
 
     def test_ai_compliance_exists(self):
         """AI工具合规声明书存在"""
-        base2 = r"D:\智能化开发应用\2026四川大学生计算机竞赛\提交包"
+        base2 = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
         path = os.path.join(base2, '01-作品与答辩材料', 'AI工具使用合规性声明书.txt')
         self.assertTrue(os.path.exists(path), f"AI合规声明书不存在于 {path}")
 

@@ -4,7 +4,7 @@ from typing import Dict, List, Optional
 from datetime import datetime
 import os
 from utils.helpers import logger_setup
-from utils.constants import CORE_SYMBOLS, SYMBOL_NAMES
+from utils.constants import CORE_SYMBOLS, SYMBOL_NAMES, PRICING_CONFIG
 from utils.config import config
 
 logger = logger_setup('social_value')
@@ -85,7 +85,9 @@ class SocialValueCalculator:
 
     def calculate_premium_reduction(self, symbol: str,
                                      current_premium_per_mu: float = None,
-                                     model_mape: float = 0.42) -> Dict:
+                                     model_mape: float = None) -> Dict:
+        if model_mape is None:
+            model_mape = PRICING_CONFIG.get('achieved_mape_with_lag', 0.42)
         params = self.params.get(symbol, {})
         if current_premium_per_mu is None:
             current_premium_per_mu = params.get('current_premium_per_mu', 25.0)
@@ -107,7 +109,9 @@ class SocialValueCalculator:
 
     def calculate_loss_ratio_improvement(self, symbol: str,
                                            current_loss_ratio: float = None,
-                                           model_mape: float = 0.42) -> Dict:
+                                           model_mape: float = None) -> Dict:
+        if model_mape is None:
+            model_mape = PRICING_CONFIG.get('achieved_mape_with_lag', 0.42)
         params = self.params.get(symbol, {})
         if current_loss_ratio is None:
             current_loss_ratio = params.get('current_loss_ratio', 0.78)
@@ -155,7 +159,9 @@ class SocialValueCalculator:
         logger.info(f"[{symbol}] 财政效率: 每亩节省{subsidy_saving_per_mu:.2f}元, 提升{efficiency_improvement:.1f}%")
         return result
 
-    def calculate_all_symbols(self, model_mape: float = 0.42) -> pd.DataFrame:
+    def calculate_all_symbols(self, model_mape: float = None) -> pd.DataFrame:
+        if model_mape is None:
+            model_mape = PRICING_CONFIG.get('achieved_mape_with_lag', 0.42)
         rows = []
         for symbol in CORE_SYMBOLS:
             pr = self.calculate_premium_reduction(symbol, model_mape=model_mape)
@@ -180,11 +186,13 @@ class SocialValueCalculator:
                     f"平均财政效率提升{df['财政效率提升(%)'].mean():.1f}%")
         return df
 
-    def generate_county_simulation(self, county_name: str = '四川省自贡市',
+    def generate_county_simulation(self, county_name: str = '某省某市',
                                      crop: str = '大豆',
                                      symbol: str = 'A0',
                                      planting_area_10k_mu: float = 85.0,
-                                     model_mape: float = 0.42) -> str:
+                                     model_mape: float = None) -> str:
+        if model_mape is None:
+            model_mape = PRICING_CONFIG.get('achieved_mape_with_lag', 0.42)
         params = self.params.get(symbol, {})
         current_premium = params.get('current_premium_per_mu', 28.0)
         current_loss_ratio = params.get('current_loss_ratio', 0.78)
@@ -204,7 +212,7 @@ class SocialValueCalculator:
 
 ## 一、仿真背景
 
-{county_name}是四川省{crop}主产区之一，种植面积{planting_area_10k_mu}万亩。当前{crop}种植险面临保费偏高、赔付率居高不下、财政补贴效率不足三大痛点。
+{county_name}是某省{crop}主产区之一，种植面积{planting_area_10k_mu}万亩。当前{crop}种植险面临保费偏高、赔付率居高不下、财政补贴效率不足三大痛点。
 
 本报告基于**因果推断智能定价模型**，对{county_name}{crop}种植险进行全链条仿真测算。
 
@@ -276,7 +284,7 @@ class SocialValueCalculator:
                 '优化后保费(元/亩)': round(pr['new_premium_per_mu'], 1),
                 '赔付率降低(%)': round(lr['risk_reduction_pct'], 1),
                 '优化后赔付率': round(lr['new_loss_ratio'], 4),
-                '模型状态': '✅ 当前' if abs(mape - 0.42) < 0.01 else ('🟢 优秀' if mape < 1 else ('🟡 良好' if mape < 3 else '🔴 需改进')),
+                '模型状态': '✅ 当前' if abs(mape - PRICING_CONFIG.get('achieved_mape_with_lag', 0.42)) < 0.01 else ('🟢 优秀' if mape < 1 else ('🟡 良好' if mape < 3 else '🔴 需改进')),
             })
         df = pd.DataFrame(rows)
         logger.info(f"敏感性分析完成: {symbol}, {len(rows)}个MAPE水平")

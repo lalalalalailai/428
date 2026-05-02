@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from typing import Dict, List, Optional
 
-from .data_loader import DataLoader
+from data.data_loader import DataLoader
 from utils.constants import FEATURE_CONFIG, CORE_SYMBOLS, DAG_CONFIG
 from utils.helpers import logger_setup, timer
 

@@ -3,7 +3,7 @@ import pandas as pd
 import os
 from typing import Dict, List, Optional
 from utils.helpers import logger_setup
-from utils.constants import CORE_SYMBOLS, SYMBOL_NAMES, PROVINCES
+from utils.constants import CORE_SYMBOLS, SYMBOL_NAMES, PROVINCES, PRICING_CONFIG
 from utils.config import config
 
 logger = logger_setup('premium_calculator')
@@ -91,7 +91,9 @@ class PremiumCalculator:
                            province: str = None,
                            planting_period: str = '春播',
                            coverage_level: float = 0.80,
-                           model_mape: float = 0.42) -> Dict:
+                           model_mape: float = None) -> Dict:
+        if model_mape is None:
+            model_mape = PRICING_CONFIG.get('achieved_mape_with_lag', 0.42)
         rate_info = self.rates.get(symbol, {'base_rate': 0.06, 'risk_loading': 0.015, 'province_factor': {}})
         base_rate = rate_info['base_rate']
         risk_loading = rate_info['risk_loading']

@@ -211,8 +211,8 @@ def render_report_summary():
     import streamlit as st
     from utils.constants import PRICING_CONFIG
 
-    mape_ref = PRICING_CONFIG.get('achieved_mape_reference', 0.42)
-    acc_ref = PRICING_CONFIG.get('achieved_accuracy_reference', 99.58)
+    mape_ref = PRICING_CONFIG.get('achieved_mape_with_lag', 0.42)
+    acc_ref = 100 - PRICING_CONFIG.get('achieved_mape_with_lag', 0.42)
     mape_str = f"{mape_ref}%"
     acc_str = f"{acc_ref}%"
 

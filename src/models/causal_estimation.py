@@ -148,6 +148,14 @@ class PSMEstimator:
         pscores = self.estimate_propensity_scores(data)
         matched = self.perform_matching(data, pscores)
         result = self.estimate_ate(data, matched)
+        try:
+            balance_df = self.check_balance(data, matched)
+            result['balance_check'] = balance_df.to_dict('records')
+            avg_post_smd = balance_df['post_match_std_diff'].mean() if len(balance_df) > 0 else None
+            result['avg_post_match_smd'] = round(avg_post_smd, 4) if avg_post_smd is not None else None
+            result['balance_achieved'] = avg_post_smd is not None and avg_post_smd < 0.1
+        except Exception:
+            pass
         return result
 
 
@@ -155,8 +163,9 @@ class SLearner:
     def __init__(self, base_learner=None):
         from xgboost import XGBRegressor
         self.model = base_learner or XGBRegressor(
-            n_estimators=200, max_depth=6, learning_rate=0.1,
-            random_state=42, n_jobs=-1
+            n_estimators=200, max_depth=4, learning_rate=0.1,
+            random_state=42, n_jobs=-1,
+            min_child_weight=5, subsample=0.8, colsample_bytree=0.8
         )
 
     def fit(self, X, treatment, y):
@@ -168,6 +177,14 @@ class SLearner:
             X_train = pd.DataFrame(X)
         X_train['_treatment'] = treatment.values if hasattr(treatment, 'values') else treatment
         self.model.fit(X_train, y)
+        self._treatment_importance = None
+        try:
+            imp = self.model.feature_importances_
+            feat_names = list(X_train.columns)
+            if '_treatment' in feat_names:
+                self._treatment_importance = imp[feat_names.index('_treatment')]
+        except Exception:
+            pass
         return self
 
     def estimate_effect(self, X, treatment_values=(0, 1)):
@@ -176,13 +193,18 @@ class SLearner:
             X_copy = X.copy()
         else:
             X_copy = pd.DataFrame(X)
-        effects = {}
-        for tv in treatment_values:
-            X_copy['_treatment'] = tv
-            pred_tv = self.model.predict(X_copy)
-            effects[f'treatment_{tv}_mean'] = float(np.mean(pred_tv))
-        ate = effects.get('treatment_1_mean', 0) - effects.get('treatment_0_mean', 0)
-        return {'ate': ate, 'details': effects}
+        X_t1 = X_copy.copy()
+        X_t1['_treatment'] = 1
+        X_t0 = X_copy.copy()
+        X_t0['_treatment'] = 0
+        pred_t1 = self.model.predict(X_t1)
+        pred_t0 = self.model.predict(X_t0)
+        ate = float(np.mean(pred_t1 - pred_t0))
+        return {'ate': ate, 'details': {
+            'treatment_1_mean': float(np.mean(pred_t1)),
+            'treatment_0_mean': float(np.mean(pred_t0)),
+            'treatment_importance': self._treatment_importance
+        }}
 
 
 class TLearner:
@@ -237,7 +259,7 @@ class TLearner:
 
 
 def compare_causal_methods(X, treatment, y):
-    logger.info("开始PSM/S-Learner/T-Learner对比验证...")
+    logger.info("开始五重因果验证: PSM/S-Learner/T-Learner/DML/IV...")
     results = {}
     try:
         psm = PSMEstimator(ratio=3)
@@ -284,12 +306,28 @@ def compare_causal_methods(X, treatment, y):
     except Exception as e:
         logger.warning(f"T-Learner估计失败: {e}")
         results['T-Learner'] = {'ate': 0, 'att': 0, 'advantage': '捕捉异质性', 'scenario': '风险溢价个性化计算'}
+    try:
+        dml = DMLEstimator()
+        dml.fit(X, treatment, y)
+        dml_effect = dml.estimate_effect()
+        results['DML'] = dml_effect
+    except Exception as e:
+        logger.warning(f"DML估计失败: {e}")
+        results['DML'] = {'ate': 0, 'advantage': '双重机器学习', 'scenario': '高维混淆变量', 'significant': False}
+    try:
+        iv = IVEstimator()
+        iv.fit(X, treatment, y)
+        iv_effect = iv.estimate_effect()
+        results['IV-2SLS'] = iv_effect
+    except Exception as e:
+        logger.warning(f"IV估计失败: {e}")
+        results['IV-2SLS'] = {'ate': 0, 'advantage': '工具变量法', 'scenario': '内生性因果识别', 'significant': False}
     best_method = 'T-Learner'
     t_ate = abs(results.get('T-Learner', {}).get('ate', 0))
     s_ate = abs(results.get('S-Learner', {}).get('ate', 0))
     if t_ate > 0 and s_ate > 0:
         best_method = 'T-Learner'
-    logger.info(f"对比完成: 推荐方法={best_method}（适配农险期货异质性风险定价）")
+    logger.info(f"五重因果验证完成: 推荐方法={best_method}（适配农险期货异质性风险定价）")
     return results, best_method
 
 
@@ -333,3 +371,102 @@ def placebo_test(X, treatment, y, n_permutation=200, random_state=42):
     }
     logger.info(f"安慰剂检验: 真实ATE={real_ate:.4f}, 安慰剂均值={placebo_mean:.4f}, P={p_value:.4f}")
     return result
+
+
+class DMLEstimator:
+    def __init__(self, model_y=None, model_t=None, n_folds=5, random_state=42):
+        from sklearn.ensemble import GradientBoostingRegressor
+        self.model_y = model_y or GradientBoostingRegressor(
+            n_estimators=100, max_depth=4, learning_rate=0.1, random_state=random_state)
+        self.model_t = model_t or GradientBoostingRegressor(
+            n_estimators=100, max_depth=4, learning_rate=0.1, random_state=random_state)
+        self.n_folds = n_folds
+        self.random_state = random_state
+        self.fitted = False
+
+    def fit(self, X, treatment, y):
+        from sklearn.model_selection import KFold
+        X = np.asarray(X) if not isinstance(X, np.ndarray) else X
+        treatment = np.asarray(treatment).flatten()
+        y = np.asarray(y).flatten()
+        n = len(y)
+        y_resid = np.zeros(n)
+        t_resid = np.zeros(n)
+        kf = KFold(n_splits=self.n_folds, shuffle=True, random_state=self.random_state)
+        for train_idx, test_idx in kf.split(X):
+            self.model_y.fit(X[train_idx], y[train_idx])
+            y_resid[test_idx] = y[test_idx] - self.model_y.predict(X[test_idx])
+            self.model_t.fit(X[train_idx], treatment[train_idx])
+            t_resid[test_idx] = treatment[test_idx] - self.model_t.predict(X[test_idx])
+        t_var = np.var(t_resid)
+        if t_var < 1e-10:
+            t_var = 1e-10
+        self.theta_ = np.mean(y_resid * t_resid) / t_var
+        self.y_resid_ = y_resid
+        self.t_resid_ = t_resid
+        self.fitted = True
+        return {'ate': self.theta_, 'method': 'DML'}
+
+    def estimate_effect(self, X=None):
+        if not self.fitted:
+            return {'ate': 0, 'ci_lower': 0, 'ci_upper': 0, 'method': 'DML'}
+        se = np.sqrt(np.var(self.y_resid_ - self.theta_ * self.t_resid_) / len(self.y_resid_))
+        z = stats.norm.ppf(0.975)
+        return {
+            'ate': round(float(self.theta_), 6),
+            'ci_lower': round(float(self.theta_ - z * se), 6),
+            'ci_upper': round(float(self.theta_ + z * se), 6),
+            'se': round(float(se), 6),
+            'p_value': round(float(2 * (1 - stats.norm.cdf(abs(self.theta_ / se)))), 6),
+            'significant': abs(self.theta_ / se) > 1.96,
+            'method': 'DML',
+            'advantage': '双重机器学习，消除混淆偏误',
+            'scenario': '高维混淆变量下的因果效应'
+        }
+
+
+class IVEstimator:
+    def __init__(self, random_state=42):
+        self.random_state = random_state
+        self.fitted = False
+
+    def fit(self, X, treatment, y, instrument=None):
+        X = np.asarray(X) if not isinstance(X, np.ndarray) else X
+        treatment = np.asarray(treatment).flatten()
+        y = np.asarray(y).flatten()
+        n = len(y)
+        if instrument is None:
+            rng = np.random.RandomState(self.random_state)
+            lag_t = np.roll(treatment, 1)
+            lag_t[0] = treatment[0]
+            instrument = lag_t.reshape(-1, 1)
+        instrument = np.asarray(instrument).reshape(n, -1)
+        Z = np.column_stack([instrument, X])
+        from sklearn.linear_model import LinearRegression
+        stage1 = LinearRegression().fit(Z, treatment)
+        t_hat = stage1.predict(Z)
+        X2 = np.column_stack([t_hat, X])
+        stage2 = LinearRegression().fit(X2, y)
+        self.iv_coef_ = stage2.coef_[0]
+        self.stage1_r2_ = stage1.score(Z, treatment)
+        residuals = y - stage2.predict(X2)
+        self.se_ = np.sqrt(np.var(residuals) / (n * np.var(t_hat)))
+        self.fitted = True
+        return {'ate': self.iv_coef_, 'method': 'IV-2SLS', 'first_stage_r2': self.stage1_r2_}
+
+    def estimate_effect(self, X=None):
+        if not self.fitted:
+            return {'ate': 0, 'ci_lower': 0, 'ci_upper': 0, 'method': 'IV-2SLS'}
+        z = stats.norm.ppf(0.975)
+        return {
+            'ate': round(float(self.iv_coef_), 6),
+            'ci_lower': round(float(self.iv_coef_ - z * self.se_), 6),
+            'ci_upper': round(float(self.iv_coef_ + z * self.se_), 6),
+            'se': round(float(self.se_), 6),
+            'p_value': round(float(2 * (1 - stats.norm.cdf(abs(self.iv_coef_ / self.se_)))), 6),
+            'significant': abs(self.iv_coef_ / self.se_) > 1.96,
+            'first_stage_r2': round(float(self.stage1_r2_), 4),
+            'method': 'IV-2SLS',
+            'advantage': '工具变量法，解决内生性问题',
+            'scenario': '价格与供需互为因果时的因果识别'
+        }

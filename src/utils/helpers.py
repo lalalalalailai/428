@@ -14,7 +14,7 @@ def timer(func: Callable = None, *, verbose: bool = True):
             elapsed = end_time - start_time
             if verbose:
                 print(f"[TIMER] {fn.__name__} executed in {elapsed:.2f}s")
-            return result, elapsed
+            return result
         return wrapper
     if func is not None:
         return decorator(func)

@@ -1,7 +1,10 @@
 import os
+import logging
 from pathlib import Path
 from typing import Optional
-from .constants import DATA_CONFIG, MODEL_PARAMS
+from utils.constants import DATA_CONFIG, MODEL_PARAMS
+
+logger = logging.getLogger(__name__)
 
 class Config:
     _instance = None
@@ -23,20 +26,34 @@ class Config:
 
     def _detect_data_paths(self):
         candidates = [self._base_dir, self._base_dir.parent]
+
+        for candidate in [self._base_dir, self._base_dir.parent]:
+            data_path = candidate / 'data'
+            if data_path.exists() and (data_path / 'futures').exists():
+                self.data_root = data_path
+                self._data_root_str = str(data_path)
+                logger.info(f"✅ 检测到数据目录 (data模式): {self._data_root_str}")
+                return
+
         for candidate in candidates:
             enhanced_path = candidate / 'enhanced_data'
             if enhanced_path.exists() and (enhanced_path / 'all_factors').exists():
                 self.data_root = enhanced_path
                 self._data_root_str = str(enhanced_path)
+                logger.info(f"✅ 检测到数据目录 (enhanced_data模式): {self._data_root_str}")
                 return
+
         for candidate in [self._base_dir.parent, self._base_dir.parent.parent]:
             data_dir = candidate / '05_数据集'
             if data_dir.exists() and (data_dir / 'all_factors').exists():
                 self.data_root = data_dir
                 self._data_root_str = str(data_dir)
+                logger.info(f"✅ 检测到数据目录 (05_数据集模式): {self._data_root_str}")
                 return
+
         self.data_root = self._base_dir
         self._data_root_str = str(self._base_dir)
+        logger.warning(f"⚠️ 未检测到标准数据目录，使用默认路径: {self._data_root_str}")
 
     @property
     def base_dir(self) -> Path:
@@ -48,10 +65,16 @@ class Config:
 
     @property
     def futures_dir(self) -> str:
+        direct_path = os.path.join(self._data_root_str, 'futures')
+        if os.path.exists(direct_path):
+            return direct_path
         return os.path.join(self._data_root_str, 'all_factors', 'futures')
 
     @property
     def macro_dir(self) -> str:
+        macro_direct = os.path.join(self._data_root_str, 'macro')
+        if os.path.exists(macro_direct):
+            return macro_direct
         return os.path.join(self._data_root_str, 'all_factors', 'macro')
 
     @property
@@ -68,7 +91,10 @@ class Config:
 
     @property
     def remote_sensing_dir(self) -> str:
-        return os.path.join(self._data_root_str, 'remote_sensing')
+        rs_direct = os.path.join(self._data_root_str, 'remote_sensing')
+        if os.path.exists(rs_direct):
+            return rs_direct
+        return os.path.join(self._data_root_str, 'all_factors', 'remote_sensing')
 
     def get_futures_path(self, symbol: str) -> str:
         symbol_map = {

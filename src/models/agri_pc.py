@@ -46,7 +46,7 @@ Agri-PC: 农险时序因果发现算法 (Agricultural Temporal Causal Discovery)
       Nearest-Neighbor Estimator of Conditional Mutual Information.
       AISTATS.
 
-Author: 农险期货智能定价模型研究团队
+Author: Team IFAP
 Date: 2026-04
 """
 
@@ -276,7 +276,7 @@ class AgriPC:
             src_order = AGRI_TEMPORAL_ORDER.get(src, 5)
             tgt_order = AGRI_TEMPORAL_ORDER.get(tgt, 5)
 
-            if src_order >= tgt_order and src != tgt:
+            if src_order > tgt_order and src != tgt:
                 has_reverse = graph.graph.has_edge(tgt, src)
                 if not has_reverse or tgt_order < src_order:
                     edges_to_remove.append((src, tgt))
@@ -435,7 +435,7 @@ class AgriPC:
         for src, tgt in graph.edges:
             src_order = AGRI_TEMPORAL_ORDER.get(src, 5)
             tgt_order = AGRI_TEMPORAL_ORDER.get(tgt, 5)
-            if src_order >= tgt_order:
+            if src_order > tgt_order:
                 violations.append({
                     'edge': (src, tgt),
                     'src_order': src_order,

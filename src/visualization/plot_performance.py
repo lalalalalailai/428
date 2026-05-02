@@ -148,3 +148,99 @@ def _placeholder_fig(msg):
     fig = go.Figure()
     fig.update_layout(title=msg, template='plotly_white')
     return fig
+
+
+def plot_shap_summary(shap_values: np.ndarray, feature_names: list,
+                        title: str = "SHAP特征贡献分析") -> 'go.Figure':
+    if go is None:
+        return _placeholder_fig("需要安装plotly")
+    if shap_values is None or len(shap_values) == 0:
+        return _placeholder_fig("无SHAP数据")
+
+    mean_abs_shap = np.abs(shap_values).mean(axis=0)
+    sorted_idx = np.argsort(mean_abs_shap)[::-1][:15]
+    sorted_names = [feature_names[i] if i < len(feature_names) else f'f{i}' for i in sorted_idx]
+    sorted_values = mean_abs_shap[sorted_idx]
+
+    fig = go.Figure(data=[go.Bar(
+        x=sorted_values[::-1],
+        y=sorted_names[::-1],
+        orientation='h',
+        marker_color='#d97706',
+        text=[f'{v:.4f}' for v in sorted_values[::-1]],
+        textposition='outside',
+        textfont=dict(color='#475569', size=10)
+    )])
+    fig.update_layout(**_make_layout(title, height=400, margin_b=40,
+                                     xaxis_title='mean(|SHAP value|)', yaxis_title=''))
+    return fig
+
+
+def plot_shap_waterfall(shap_values: np.ndarray, feature_names: list,
+                         base_value: float, sample_idx: int = 0,
+                         title: str = "SHAP单样本解释(瀑布图)") -> 'go.Figure':
+    if go is None:
+        return _placeholder_fig("需要安装plotly")
+    if shap_values is None or len(shap_values) == 0:
+        return _placeholder_fig("无SHAP数据")
+
+    sample_shap = shap_values[sample_idx] if shap_values.ndim > 1 else shap_values
+    sorted_idx = np.argsort(np.abs(sample_shap))[::-1][:10]
+    names = [feature_names[i] if i < len(feature_names) else f'f{i}' for i in sorted_idx]
+    values = sample_shap[sorted_idx]
+
+    cumulative = base_value
+    x_vals = [base_value]
+    for v in values:
+        cumulative += v
+        x_vals.append(cumulative)
+
+    fig = go.Figure()
+    colors = ['#4caf50' if v >= 0 else '#dc2626' for v in values]
+    for i, (name, val, color) in enumerate(zip(names, values, colors)):
+        fig.add_trace(go.Bar(
+            x=[val], y=[name],
+            orientation='h',
+            marker_color=color,
+            name=name,
+            showlegend=False,
+            text=f'{val:+.2f}',
+            textposition='outside'
+        ))
+    fig.update_layout(**_make_layout(title, height=350, margin_b=40,
+                                     xaxis_title='SHAP value', yaxis_title=''))
+    return fig
+
+
+def plot_lag_vs_pure_comparison(lag_mape: float, pure_mape: float,
+                                  lag_r2: float = None, pure_r2: float = None,
+                                  title: str = "Lag vs 纯预测精度对比") -> 'go.Figure':
+    if go is None:
+        return _placeholder_fig("需要安装plotly")
+
+    categories = ['MAPE (%)']
+    lag_vals = [lag_mape]
+    pure_vals = [pure_mape]
+
+    if lag_r2 is not None and pure_r2 is not None:
+        categories.append('R²')
+        lag_vals.append(lag_r2 * 100)
+        pure_vals.append(pure_r2 * 100)
+
+    fig = go.Figure(data=[
+        go.Bar(name='含lag特征', x=categories, y=lag_vals,
+               marker_color='#2563eb', text=[f'{v:.2f}' for v in lag_vals],
+               textposition='outside'),
+        go.Bar(name='纯预测(无lag)', x=categories, y=pure_vals,
+               marker_color='#d97706', text=[f'{v:.2f}' for v in pure_vals],
+               textposition='outside')
+    ])
+    fig.update_layout(
+        barmode='group',
+        title=dict(text=title, font=dict(size=16, color='#475569', family='Microsoft YaHei')),
+        template='plotly_white',
+        paper_bgcolor='#f8fafc',
+        height=400,
+        legend=dict(font=dict(color='#475569'), orientation='h', yanchor='bottom', y=1.02)
+    )
+    return fig

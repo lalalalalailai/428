@@ -38,7 +38,7 @@ CCP: 因果保形预测定价框架 (Causal-Conformal Pricing)
   [3] Gibbs, I. & Candes, E. (2021). Adaptive Conformal Regression
       Under Distribution Shift. NeurIPS.
 
-Author: 农险期货智能定价模型研究团队
+Author: Team IFAP
 Date: 2026-04
 """
 
@@ -51,6 +51,30 @@ import logging
 from utils.helpers import logger_setup, timer
 
 logger = logger_setup('ccp')
+
+
+def _compute_distribution_weights(X_source: np.ndarray, X_target: np.ndarray) -> np.ndarray:
+    n_source = X_source.shape[0]
+    n_target = X_target.shape[0]
+    n_features = X_source.shape[1] if X_source.ndim > 1 else 1
+    if n_features == 1:
+        X_source = X_source.reshape(-1, 1)
+        X_target = X_target.reshape(-1, 1)
+    bandwidth = np.std(X_source, axis=0) + 1e-8
+    from scipy.spatial.distance import cdist
+    dists = cdist(X_target, X_source, metric='seuclidean', V=bandwidth)
+    kernel_vals = np.exp(-0.5 * dists ** 2)
+    density_target = np.mean(kernel_vals, axis=1)
+    dists_ss = cdist(X_source, X_source, metric='seuclidean', V=bandwidth)
+    kernel_ss = np.exp(-0.5 * dists_ss ** 2)
+    density_source = np.mean(kernel_ss, axis=0)
+    source_density_at_target = np.zeros(n_target)
+    for i in range(n_target):
+        dists_i = cdist(X_target[i:i+1], X_source, metric='seuclidean', V=bandwidth)
+        source_density_at_target[i] = np.mean(np.exp(-0.5 * dists_i ** 2))
+    ratio = np.clip(source_density_at_target / (density_target + 1e-10), 0.5, 2.0)
+    weights = ratio / np.mean(ratio)
+    return weights
 
 
 class CausalConformalPricing:
@@ -150,9 +174,20 @@ class CausalConformalPricing:
                     q_low_calib - causal_residuals[calib_idx],
                     causal_residuals[calib_idx] - q_high_calib
                 )
-                q_level = np.ceil((1 - self.alpha) * (n_calib + 1)) / n_calib
-                q_level = min(q_level, 1.0)
-                self._conformity_quantile = np.quantile(conformity_scores, q_level)
+                if X_features is not None and n_train > 50:
+                    X_arr_full = X_features.values if hasattr(X_features, 'values') else X_features
+                    distribution_weights = _compute_distribution_weights(X_arr_full[train_idx], X_arr_full[calib_idx])
+                    weighted_scores = conformity_scores * distribution_weights
+                    q_level = np.ceil((1 - self.alpha) * (n_calib + 1)) / n_calib
+                    q_level = min(q_level, 1.0)
+                    self._conformity_quantile = np.quantile(weighted_scores, q_level)
+                    self._distribution_weights = distribution_weights
+                    logger.info(f"应用分布偏移加权: 均值权重={np.mean(distribution_weights):.4f}")
+                else:
+                    q_level = np.ceil((1 - self.alpha) * (n_calib + 1)) / n_calib
+                    q_level = min(q_level, 1.0)
+                    self._conformity_quantile = np.quantile(conformity_scores, q_level)
+                    self._distribution_weights = None
 
                 self._q_low_model = q_low_model
                 self._q_high_model = q_high_model

@@ -8,10 +8,10 @@ import numpy as np
 import pandas as pd
 from typing import Dict, Optional
 
-from .agri_pc import AgriPC, evaluate_graph_metrics
-from .causal_discovery import CausalDiscovery
-from .acml import ACML
-from .causal_estimation import TLearner
+from models.agri_pc import AgriPC, evaluate_graph_metrics
+from models.causal_discovery import CausalDiscovery
+from models.acml import ACML
+from models.causal_estimation import TLearner
 
 
 def compare_causal_discovery(data: pd.DataFrame,
@@ -30,7 +30,7 @@ def compare_causal_discovery(data: pd.DataFrame,
     -------
     Dict with standard_pc and agri_pc metrics
     """
-    from ..utils.constants import DAG_CONFIG
+    from utils.constants import DAG_CONFIG
 
     ground_truth_edges = set()
     for edge_list in [
@@ -188,7 +188,7 @@ def compare_causal_estimation(X: pd.DataFrame,
         }
 
         try:
-            from .statistical_tests import diebold_mariano_test
+            from models.statistical_tests import diebold_mariano_test
             errors_acml = y_true[mask] - y_pred[mask]
             errors_t = y_true[mask] - y_pred_t[mask]
             dm_result = diebold_mariano_test(errors_acml, errors_t, h=1, crit='MSE')
@@ -204,7 +204,7 @@ def compare_with_dm_test(y_true: np.ndarray,
                            y_pred_benchmarks: Dict[str, np.ndarray],
                            h: int = 1) -> Dict:
     try:
-        from .statistical_tests import comprehensive_statistical_report
+        from models.statistical_tests import comprehensive_statistical_report
         return comprehensive_statistical_report(y_true, y_pred_model, y_pred_benchmarks, h=h)
     except ImportError:
         return {'error': 'statistical_tests module not available'}

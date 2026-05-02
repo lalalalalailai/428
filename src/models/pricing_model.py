@@ -31,6 +31,9 @@ class PricingModel:
         if XGBRegressor is None:
             raise ImportError("xgboost未安装，请执行: pip install xgboost")
         params = model_params or MODEL_PARAMS.get('xgboost', {})
+        self._early_stopping = params.pop('early_stopping_rounds', None)
+        if self._early_stopping:
+            params['early_stopping_rounds'] = self._early_stopping
         self.model = XGBRegressor(**params)
         self.trained = False
         self.feature_importance_ = None
@@ -81,7 +84,12 @@ class PricingModel:
                     self.model.fit(X_train.iloc[train_idx], y_train.iloc[train_idx])
                     cv_preds[val_idx] = self.model.predict(X_train.iloc[val_idx])
                 mape_cv = mean_absolute_percentage_error(y_train, cv_preds)
-            self.model.fit(X_train, y_train)
+            fit_kwargs = {}
+            if self._early_stopping and len(X_train) > 50:
+                n_val = max(int(len(X_train) * 0.15), 30)
+                fit_kwargs['eval_set'] = [(X_train.iloc[-n_val:], y_train.iloc[-n_val:])]
+                fit_kwargs['verbose'] = False
+            self.model.fit(X_train, y_train, **fit_kwargs)
             self.training_history['cv_mape'] = mape_cv
             logger.info(f"交叉验证MAPE: {mape_cv:.4f}")
         self.feature_importance_ = dict(zip(
@@ -469,8 +477,9 @@ def pure_prediction_validate(df, target_col='close', train_window=252,
                 progress = current_window / total_windows
                 progress_callback(progress, f"纯预测窗口 {current_window}/{total_windows}")
 
-            model_params = {'n_estimators': 100, 'max_depth': 6,
-                          'learning_rate': 0.1, 'random_state': 42, 'n_jobs': -1}
+            model_params = {'n_estimators': 300, 'max_depth': 8,
+                          'learning_rate': 0.05, 'random_state': 42, 'n_jobs': -1,
+                          'early_stopping_rounds': 50}
             model = PricingModel(model_params=model_params)
             model.train(X_train, y_train, cv_folds=3)
 

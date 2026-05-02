@@ -4,7 +4,7 @@ import os
 from typing import Dict, List, Optional
 from datetime import datetime
 from utils.helpers import logger_setup
-from utils.constants import CORE_SYMBOLS, SYMBOL_NAMES
+from utils.constants import CORE_SYMBOLS, SYMBOL_NAMES, PRICING_CONFIG
 from utils.config import config
 
 logger = logger_setup('policy_evaluation')
@@ -75,7 +75,9 @@ class PolicyEvaluator:
 
     def evaluate_subsidy_efficiency(self, province: str = '四川',
                                       year: int = 2024,
-                                      model_mape: float = 0.42) -> Dict:
+                                      model_mape: float = None) -> Dict:
+        if model_mape is None:
+            model_mape = PRICING_CONFIG.get('achieved_mape_with_lag', 0.42)
         prov_data = self.province_data.get(province, self.province_data['四川'])
         current_subsidy_per_mu = prov_data['subsidy_per_mu']
         current_loss_ratio = prov_data['loss_ratio']

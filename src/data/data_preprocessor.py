@@ -6,7 +6,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import IsolationForest
 import logging
 
-from .data_loader import DataLoader
+from data.data_loader import DataLoader
 from utils.constants import DATA_CONFIG
 from utils.helpers import logger_setup
 

@@ -279,11 +279,12 @@ class QuintupleCausalValidator:
         try:
             from xgboost import XGBRegressor
             model_class = XGBRegressor
-            model_params = {'n_estimators': 100, 'max_depth': 3, 'learning_rate': 0.05, 'random_state': 42}
+            model_params = {'n_estimators': 100, 'max_depth': 4, 'learning_rate': 0.05, 'random_state': 42,
+                           'min_child_weight': 5, 'subsample': 0.8, 'colsample_bytree': 0.8}
         except ImportError:
             from sklearn.ensemble import GradientBoostingRegressor
             model_class = GradientBoostingRegressor
-            model_params = {'n_estimators': 100, 'max_depth': 3, 'learning_rate': 0.05, 'random_state': 42}
+            model_params = {'n_estimators': 100, 'max_depth': 4, 'learning_rate': 0.05, 'random_state': 42}
         
         logger.info(f"  执行S-Learner: {model_class.__name__}...")
         
@@ -295,22 +296,21 @@ class QuintupleCausalValidator:
         model = model_class(**model_params)
         model.fit(features, Y)
         
-        # ATE via平均处理效应
-        pred_all = model.predict(features)
+        features_t1 = features.copy()
+        features_t1[:, 0] = 1
+        pred_t1 = model.predict(features_t1)
         
-        # 反事实预测：将所有样本的处理变量设为均值
-        D_mean = np.mean(D)
-        features_cf = np.hstack([np.full(len(D), D_mean).reshape(-1, 1), 
-                                X if X is not None else np.zeros((len(D), 0))])
-        pred_cf = model.predict(features_cf)
+        features_t0 = features.copy()
+        features_t0[:, 0] = 0
+        pred_t0 = model.predict(features_t0)
         
-        ate_slearner = np.mean(pred_all - pred_cf)
+        ate_slearner = float(np.mean(pred_t1 - pred_t0))
         
         result = {
-            'ate': round(float(ate_slearner), 6),
+            'ate': round(ate_slearner, 6),
             'model': model_class.__name__,
             'method': 'S-Learner',
-            'baseline_prediction': round(float(np.mean(pred_cf)), 6),
+            'baseline_prediction': round(float(np.mean(pred_t0)), 6),
             'interpretation': f"S-Learner估计ATE={ate_slearner:.4f}"
         }
         

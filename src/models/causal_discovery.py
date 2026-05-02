@@ -86,6 +86,9 @@ def _bootstrap_single(data, variables, apply_business_prior, sample_ratio, rng, 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=Warning)
             
+            if isinstance(rng, int):
+                rng = np.random.RandomState(rng)
+            
             sample_idx = rng.choice(len(data), size=int(len(data) * sample_ratio), replace=True)
             
             # 安全采样：使用iloc的integer location模式，避免索引类型问题
@@ -240,21 +243,20 @@ class CausalDiscovery:
                     graph.edges = [(s, t) for s, t in graph.edges if (s, t) != (src, tgt)]
         
         # Phase 2: V-Structure Orientation (Colliders Detection)
-        # 增强版：记录V结构置信度
+        # 基于sep_set的V结构定向（标准PC算法规则：Spirtes et al., 2000）
         for i in range(len(variables)):
             for j in range(i + 1, len(variables)):
                 vi, vj = variables[i], variables[j]
+                if graph.graph.has_edge(vi, vj) or graph.graph.has_edge(vj, vi):
+                    continue
                 k_neighbors_i = [v for v in variables if v != vi and v != vj
                                and graph.graph.has_edge(v, vi)]
                 k_neighbors_j = [v for v in variables if v != vi and v != vj
                                and graph.graph.has_edge(v, vj)]
-                is_v_structure = (not graph.graph.has_edge(vi, vj) and
-                                  not graph.graph.has_edge(vj, vi) and
-                                  all(not graph.graph.has_edge(k, vj) for k in k_neighbors_i) and
-                                  all(not graph.graph.has_edge(k, vi) for k in k_neighbors_j))
-                if is_v_structure and k_neighbors_i:
-                    common_k = [k for k in k_neighbors_i if k in k_neighbors_j]
-                    for k in common_k:
+                common_k = [k for k in k_neighbors_i if k in k_neighbors_j]
+                for k in common_k:
+                    sep = sep_set.get((vi, vj), sep_set.get((vj, vi), set()))
+                    if k not in sep:
                         if not graph.graph.has_edge(vi, k):
                             graph.add_edge(vi, k, 0.3)
                         if not graph.graph.has_edge(vj, k):
@@ -383,7 +385,8 @@ class CausalDiscovery:
                 warnings.simplefilter("ignore", category=stats.ConstantInputWarning)
                 _, p_val = stats.pearsonr(x, y)
             return float(p_val), p_val > alpha
-        except:
+        except Exception as e:
+            logger.debug(f"Pearson回退失败: {e}")
             return 1.0, True
 
     @timer(verbose=False)
@@ -466,22 +469,54 @@ class CausalDiscovery:
             variables = data.select_dtypes(include=[np.number]).columns.tolist()[:12]
         edge_counts = {}
         
-        # 使用并行计算
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = []
+        use_parallel = n_bootstrap >= 5 and max_workers > 1
+        if use_parallel:
+            try:
+                from multiprocessing import cpu_count
+                actual_workers = min(max_workers, cpu_count() or 2)
+                with concurrent.futures.ProcessPoolExecutor(max_workers=actual_workers) as executor:
+                    futures = []
+                    for i in range(n_bootstrap):
+                        future = executor.submit(_bootstrap_single, data, variables,
+                                               apply_business_prior, sample_ratio, random_state + i, i)
+                        futures.append(future)
+                    
+                    for i, future in enumerate(concurrent.futures.as_completed(futures)):
+                        try:
+                            edges = future.result()
+                            if not edges or not isinstance(edges, (list, tuple)):
+                                continue
+                            for edge in edges:
+                                try:
+                                    if isinstance(edge, (list, tuple)) and len(edge) >= 2:
+                                        src, tgt = str(edge[0]), str(edge[1])
+                                    elif isinstance(edge, str) and '->' in edge:
+                                        parts = edge.split('->')
+                                        src, tgt = parts[0].strip(), parts[1].strip()
+                                    else:
+                                        continue
+                                    if src and tgt and src != tgt:
+                                        edge_key = f"{src}->{tgt}"
+                                        edge_counts[edge_key] = edge_counts.get(edge_key, 0) + 1
+                                except Exception:
+                                    continue
+                        except Exception as future_err:
+                            logger.warning(f"获取Bootstrap结果{i+1}失败: {str(future_err)[:100]}")
+                            continue
+            except Exception as parallel_err:
+                logger.warning(f"并行执行失败，回退串行: {str(parallel_err)[:100]}")
+                use_parallel = False
+        
+        if not use_parallel or not edge_counts:
+            if use_parallel and not edge_counts:
+                logger.warning("并行Bootstrap未收集到任何边，回退串行执行")
+                use_parallel = False
             for i in range(n_bootstrap):
-                future = executor.submit(_bootstrap_single, data, variables, 
-                                       apply_business_prior, sample_ratio, rng, i)
-                futures.append(future)
-            
-            for i, future in enumerate(concurrent.futures.as_completed(futures)):
                 try:
-                    edges = future.result()
+                    edges = _bootstrap_single(data, variables, apply_business_prior, sample_ratio, rng, i)
                     if not edges or not isinstance(edges, (list, tuple)):
                         continue
-                    
                     for edge in edges:
-                        # 安全提取边：支持多种格式
                         try:
                             if isinstance(edge, (list, tuple)) and len(edge) >= 2:
                                 src, tgt = str(edge[0]), str(edge[1])
@@ -489,18 +524,14 @@ class CausalDiscovery:
                                 parts = edge.split('->')
                                 src, tgt = parts[0].strip(), parts[1].strip()
                             else:
-                                logger.debug(f"跳过无法解析的边: {type(edge)} - {edge}")
                                 continue
-                            
                             if src and tgt and src != tgt:
                                 edge_key = f"{src}->{tgt}"
                                 edge_counts[edge_key] = edge_counts.get(edge_key, 0) + 1
-                        except Exception as edge_parse_err:
-                            logger.debug(f"边解析失败: {edge} - {edge_parse_err}")
+                        except Exception:
                             continue
-                            
-                except Exception as future_err:
-                    logger.warning(f"获取Bootstrap结果{i+1}失败: {str(future_err)[:100]}")
+                except Exception as e:
+                    logger.warning(f"Bootstrap第{i+1}次失败: {str(e)[:100]}")
                     continue
         
         stability_scores = {}

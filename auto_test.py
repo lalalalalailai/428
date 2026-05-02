@@ -13,8 +13,8 @@ v3.0特等奖升级 — 自动测试+日志修复引擎
 import sys, os, re, json, subprocess, datetime, time
 sys.stdout.reconfigure(encoding='utf-8')
 
-BASE = r"D:\智能化开发应用\乡村振兴背景下基于因果推断的农险期货智能定价模型构建\农险期货智能定价模型_最终提交"
-SRC = os.path.join(BASE, "04_源码及说明", "src")
+BASE = os.path.dirname(os.path.abspath(__file__))
+SRC = os.path.join(BASE, "src")
 
 print("=" * 70)
 print("  🧠 QL大脑 v3.0 自动测试+日志修复引擎")
@@ -23,7 +23,7 @@ print("=" * 70)
 
 results = {"tests": {}, "log_fixes": [], "final_verdict": ""}
 
-os.chdir(os.path.join(BASE, "04_源码及说明"))
+os.chdir(BASE)
 
 # ================================================================
 # TEST 1: Pytest全量测试

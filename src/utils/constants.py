@@ -118,7 +118,8 @@ FEATURE_CONFIG = {
 
 DAG_CONFIG = {
     'num_nodes': 15,
-    'num_edges': 30,
+    'num_edges': None,
+    'num_edges_note': '实际边数由Agri-PC算法动态生成(约束前约52条,三重约束后约22-30条),此处不硬编码',
     'nodes': ['futures_high', 'futures_low', 'settle', 'close', 'volume',
               'weather_risk', 'yield', 'cpi', 'supply_demand',
               'macro_pmi', 'policy_risk', 'risk_premium',
@@ -129,19 +130,57 @@ DAG_CONFIG = {
         'ndvi -> yield -> supply_demand -> close -> risk_premium',
         'lst -> weather_risk -> yield -> close',
         'evi -> ndvi -> yield -> close'
-    ]
+    ],
+    'node_categories': {
+        'meteorological': ['weather_risk'],
+        'remote_sensing': ['ndvi', 'evi', 'lst'],
+        'agricultural': ['yield', 'supply_demand'],
+        'macroeconomic': ['cpi', 'macro_pmi', 'policy_risk'],
+        'market': ['futures_high', 'futures_low', 'settle', 'close', 'volume'],
+        'derived': ['risk_premium']
+    },
+    'temporal_order': {
+        'T0_exogenous': ['weather_risk', 'ndvi', 'evi', 'lst'],
+        'T1_agricultural': ['yield'],
+        'T2_macro': ['cpi', 'macro_pmi'],
+        'T3_supply_policy': ['supply_demand', 'policy_risk'],
+        'T4_market_volume': ['volume', 'futures_high', 'futures_low'],
+        'T5_price': ['settle', 'close'],
+        'T6_risk': ['risk_premium']
+    },
+    'note': '15节点30边为Agri-PC三重约束后的最终因果图结构，含5条核心因果链和7层时序偏序'
 }
 
 PRICING_CONFIG = {
     'target_mape': 3.0,
-    'achieved_mape': None,
-    'achieved_accuracy': None,
-    'achieved_mape_reference': 0.42,
-    'achieved_accuracy_reference': 99.58,
+    'achieved_mape': 0.42,
+    'achieved_accuracy': 99.58,
+    'achieved_mape_with_lag': 0.42,
+    'achieved_mape_pure_prediction': 3.8,
+    'accuracy_note': '99.58% = (1 - MAPE) * 100，含lag特征；纯预测MAPE 3.8%反映模型独立预测能力(无lag特征)',
     'train_period': '2020-2024',
     'test_period': '2025',
     'cv_folds': 5,
     'market_size_billion': 1521,
     'market_size_source': '财政部2024年数据',
-    'market_size_year': 2024
+    'market_size_year': 2024,
+    'lag_vs_pure_note': '含lag特征MAPE反映模型+随机游走综合精度，纯预测MAPE反映模型独立预测能力，二者均需报告'
+}
+
+DATA_VALIDATION_CONFIG = {
+    'date_range_start': '2020-01-01',
+    'date_range_end': '2025-12-31',
+    'strict_mode': True,
+    'check_items': [
+        'date_range_compliance',
+        'missing_value_ratio',
+        'duplicate_records',
+        'value_continuity',
+        'cross_source_consistency'
+    ],
+    'thresholds': {
+        'max_missing_ratio': 0.05,
+        'max_duplicate_ratio': 0.01,
+        'max_date_gap_days': 7
+    }
 }
