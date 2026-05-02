@@ -198,16 +198,16 @@ def render_demo_mode():
         st.markdown("""
         ---
         **项目信息**
-        - **参赛类别**: 2026年四川大学生计算机设计竞赛 - 大数据应用
+        - **参赛类别**: 2026年中国大学生计算机设计大赛 - 大数据应用
         - **作品名称**: 乡村振兴背景下基于因果推断的农险期货智能定价模型
-        - **在线地址**: [GitHub](https://github.com/lalalalailai/ifap) | [Gitee](https://gitee.com/hat-stan/IFAP)
+        - **在线地址**: （提交后公布）
         - **部署版本**: v20260423
         """)
 
 def render_full_app():
     """完整模式 - 加载所有模块并运行完整应用"""
     try:
-        from app import *
+        import app
     except Exception as e:
         st.error(f"⚠️ 应用加载异常: {e}")
         st.code(traceback.format_exc())
