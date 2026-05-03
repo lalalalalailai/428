@@ -184,7 +184,7 @@ class DataPreviewTable:
 
         start_idx = (page - 1) * self.page_size
         end_idx = min(start_idx + self.page_size, total_rows)
-        st.dataframe(filtered_df.iloc[start_idx:end_idx], use_container_width=True, height=350)
+        st.dataframe(filtered_df.iloc[start_idx:end_idx], width='stretch', height=350)
 
 
 class ChartContainer:
@@ -209,7 +209,7 @@ class ChartContainer:
         </div>
         """, unsafe_allow_html=True)
         if self.chart_fig is not None:
-            st.plotly_chart(self.chart_fig, use_container_width=True)
+            st.plotly_chart(self.chart_fig, width='stretch')
             col_dl1, col_dl2 = st.columns(2)
             with col_dl1:
                 try:
@@ -308,7 +308,7 @@ def render_quick_analysis(symbol, data):
             anom_rows = []
             for col, info in results['anomalies'].items():
                 anom_rows.append({'特征': col, '异常数量': info['n_outliers'], '异常占比(%)': info['pct']})
-            st.dataframe(pd.DataFrame(anom_rows), use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame(anom_rows), width='stretch', hide_index=True)
 
     return results
 

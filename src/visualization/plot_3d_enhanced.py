@@ -203,7 +203,7 @@ def render_dataset_overview(df: pd.DataFrame, symbol_name: str = "全部品种")
         ))
         fig_corr.update_layout(height=450, title=dict(text="特征相关性矩阵"),
                                paper_bgcolor='#f8fafb')
-        st.plotly_chart(fig_corr, use_container_width=True)
+        st.plotly_chart(fig_corr, width='stretch')
 
 
 def render_report_summary():

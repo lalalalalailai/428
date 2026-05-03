@@ -840,7 +840,7 @@ def render_data_exploration():
                 }
         if stats_dict:
             stats_df = pd.DataFrame(stats_dict).T
-            st.dataframe(stats_df, use_container_width=True)
+            st.dataframe(stats_df, width='stretch')
         col_mc1, col_mc2 = st.columns(2)
         with col_mc1:
             MetricCard("总记录数", f"{len(df_filtered):,}", color="primary").render()
@@ -879,7 +879,7 @@ def render_data_exploration():
                               yaxis2=dict(title='成交量', overlaying='y', side='right',
                                          color='#64748b', showgrid=False,
                                          zeroline=False, tickfont=dict(color='#64748b')))
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
 
         elif data_type == "遥感数据":
             rs_full = loader.load_remote_sensing_data(rs_key)
@@ -933,7 +933,7 @@ def render_data_exploration():
                            color='#64748b', showgrid=False, zeroline=False,
                            tickfont=dict(color='#64748b'))
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
 
             st.markdown(f"**📊 {metric_label} 统计摘要**")
             col_rs_left, col_rs_right = st.columns(2)
@@ -991,7 +991,7 @@ def render_data_exploration():
                            position=0.92, color='#059669', showgrid=False,
                            tickfont=dict(color='#64748b'))
             )
-            st.plotly_chart(fig_weather, use_container_width=True)
+            st.plotly_chart(fig_weather, width='stretch')
 
             wcol_monthly, wcol_stats = st.columns([2, 1])
             with wcol_monthly:
@@ -1002,7 +1002,7 @@ def render_data_exploration():
                     monthly_temp['year'] = monthly_temp.index.year
                     monthly_temp['month'] = monthly_temp.index.month
                     monthly_pivot = monthly_temp.pivot_table(values=temp_col, index='month', columns='year', aggfunc='mean')
-                    st.dataframe(round(monthly_pivot, 1).astype(float), use_container_width=True, height=250)
+                    st.dataframe(round(monthly_pivot, 1).astype(float), width='stretch', height=250)
             with wcol_stats:
                 st.markdown("**🌡️ 年度气象统计**")
                 if temp_col and isinstance(weather_full.index, pd.DatetimeIndex):
@@ -1015,7 +1015,7 @@ def render_data_exploration():
                         'humidity': 'mean'
                     }).round(2)
                     annual_stats.columns = ['均温°C', '最低温', '最高温', '年降水mm', '平均湿度%']
-                    st.dataframe(annual_stats, use_container_width=True, height=250)
+                    st.dataframe(annual_stats, width='stretch', height=250)
 
     except Exception as e:
         st.warning(f"图表渲染异常: {str(e)[:150]}")
@@ -1058,7 +1058,7 @@ def render_data_exploration():
                 '状态': '✅' if detail.get('score', 0) >= 70 else '⚠️'
             })
         if quality_rows:
-            st.dataframe(pd.DataFrame(quality_rows), use_container_width=True, height=200)
+            st.dataframe(pd.DataFrame(quality_rows), width='stretch', height=200)
     except Exception as e:
         st.info(f"数据质量验证: {str(e)[:80]}")
 
@@ -1235,7 +1235,7 @@ def render_causal_analysis():
             f"{len(df_features)}行样本")
     col_run, _ = st.columns([3, 1])
     with col_run:
-        run_analysis = st.button("🚀 运行因果分析", type="primary", use_container_width=True)
+        run_analysis = st.button("🚀 运行因果分析", type="primary", width='stretch')
 
     _data_hash = _make_data_hash(df_features, DAG_CONFIG.get('nodes', []))
     cache_key = f"{selected_symbol}_{_data_hash}"
@@ -1295,10 +1295,10 @@ def render_causal_analysis():
                 edge_strengths=edge_strengths,
                 title=f"因果DAG ({causal_graph.number_of_nodes()}节点, {causal_graph.number_of_edges()}边)"
             )
-            st.plotly_chart(dag_fig, use_container_width=True)
+            st.plotly_chart(dag_fig, width='stretch')
         st.subheader("📊 变量相关性热力图")
         corr_fig = plot_correlation_heatmap(df_features[variables], title="变量相关性矩阵")
-        st.plotly_chart(corr_fig, use_container_width=True)
+        st.plotly_chart(corr_fig, width='stretch')
         st.subheader("🎯 因子影响度排序")
         if influence_scores:
             cols_inf = st.columns(min(len(influence_scores), 4))
@@ -1543,7 +1543,7 @@ def render_causal_analysis():
                     '✅' if _five_results.get('IV-2SLS', {}).get('significant', False) else '❌'
                 ]
             }
-            st.dataframe(pd.DataFrame(compare_data), use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame(compare_data), width='stretch', hide_index=True)
             st.session_state.causal_estimation_results = _five_results
         except Exception as e:
             st.info(f"对比总览计算中: {str(e)[:80]}")
@@ -1579,7 +1579,7 @@ def render_causal_analysis():
                         f"{consensus.get('n_valid_methods', 0)}个方法有效"
                     ]
                 }
-                st.dataframe(pd.DataFrame(score_data), use_container_width=True, hide_index=True)
+                st.dataframe(pd.DataFrame(score_data), width='stretch', hide_index=True)
 
                 robust_findings = consensus_analyzer.get_robust_findings()
                 if robust_findings:
@@ -1641,7 +1641,7 @@ def render_causal_analysis():
                     {'因果边': k, '稳定性': v, '可靠': '✅' if v >= 0.7 else '⚠️'}
                     for k, v in list(bootstrap_results['stability_scores'].items())[:20]
                 ])
-                st.dataframe(bs_df, use_container_width=True, height=250)
+                st.dataframe(bs_df, width='stretch', height=250)
         except Exception as e:
             st.info(f"Bootstrap验证计算中: {str(e)[:80]}")
 
@@ -1791,7 +1791,7 @@ def render_pricing_model_page():
     
     col_train, _ = st.columns([3, 1])
     with col_train:
-        train_btn = st.button("🎯 训练定价模型", type="primary", use_container_width=True)
+        train_btn = st.button("🎯 训练定价模型", type="primary", width='stretch')
     
     if train_btn:
         st.session_state.pricing_running = True
@@ -1868,19 +1868,19 @@ def render_pricing_model_page():
         col_perf, col_feat = st.columns([1, 1])
         with col_perf:
             perf_fig = plot_model_performance(m_test, title=f"{SYMBOL_NAMES.get(selected_symbol, '')} 模型性能")
-            st.plotly_chart(perf_fig, use_container_width=True)
+            st.plotly_chart(perf_fig, width='stretch')
         with col_feat:
             fi_fig = plot_feature_importance(results['feature_importance'])
-            st.plotly_chart(fi_fig, use_container_width=True)
+            st.plotly_chart(fi_fig, width='stretch')
         st.subheader("📈 价格预测对比")
         pred_fig = plot_prediction_comparison(
             results['dates_test'], results['y_test'], results['y_pred_test'],
             title=f"{SYMBOL_NAMES.get(selected_symbol, '')} 实际 vs 预测价格"
         )
-        st.plotly_chart(pred_fig, use_container_width=True)
+        st.plotly_chart(pred_fig, width='stretch')
         errors = np.abs((results['y_test'] - results['y_pred_test']) / (results['y_test'] + 1e-8)) * 100
         err_fig = plot_error_distribution(errors)
-        st.plotly_chart(err_fig, use_container_width=True)
+        st.plotly_chart(err_fig, width='stretch')
         st.subheader("📋 定价详情表")
         st.caption(f"📅 数据时间范围: **{DATA_DATE_START.strftime('%Y.%m')} ~ {DATA_DATE_END.strftime('%Y.%m')}**")
         detail_df = pd.DataFrame({
@@ -1893,7 +1893,7 @@ def render_pricing_model_page():
             detail_df['日期'] = pd.to_datetime(detail_df['日期'])
             mask = (detail_df['日期'] >= DATA_DATE_START) & (detail_df['日期'] <= DATA_DATE_END)
             detail_df = detail_df.loc[mask]
-        st.dataframe(detail_df, use_container_width=True, height=300)
+        st.dataframe(detail_df, width='stretch', height=300)
 
         st.markdown("---")
         st.subheader("🔬 消融实验（Ablation Study）")
@@ -1909,7 +1909,7 @@ def render_pricing_model_page():
                     k: {'方法': v['name'], 'MAPE(%)': v['mape'], 'R²': v['r2'], 'MAE': v['mae']}
                     for k, v in ablation_results.items()
                 }).T
-                st.dataframe(ablation_df, use_container_width=True)
+                st.dataframe(ablation_df, width='stretch')
                 best_key = min(ablation_results, key=lambda k: ablation_results[k]['mape'])
                 st.success(f"✅ 最优方法: **{ablation_results[best_key]['name']}** (MAPE={ablation_results[best_key]['mape']:.2f}%)")
         except Exception as e:
@@ -1942,7 +1942,7 @@ def render_pricing_model_page():
                     }
                     for k, v in baseline_results.items()
                 }).T
-                st.dataframe(baseline_df, use_container_width=True)
+                st.dataframe(baseline_df, width='stretch')
         except Exception as e:
             st.info(f"基线对比计算中: {str(e)[:80]}")
 
@@ -1982,7 +1982,7 @@ def render_pricing_model_page():
                     st.success(f"📋 {rolling_results['declaration']}")
                 if rolling_results['windows']:
                     rolling_df = pd.DataFrame(rolling_results['windows'])
-                    st.dataframe(rolling_df, use_container_width=True, height=200)
+                    st.dataframe(rolling_df, width='stretch', height=200)
                 if st.button("📥 导出全量滚动窗口报告", key="export_rolling"):
                     report_md = generate_rolling_window_report(rolling_results, selected_symbol)
                     st.download_button("下载报告(Markdown)", report_md.encode('utf-8'),
@@ -2069,7 +2069,7 @@ def render_pricing_model_page():
             sensitivity_results = sample_sensitivity_analysis(df_features, target_col=target_col)
             if sensitivity_results and sensitivity_results.get('period_results'):
                 sens_df = pd.DataFrame(sensitivity_results['period_results']).T
-                st.dataframe(sens_df, use_container_width=True)
+                st.dataframe(sens_df, width='stretch')
                 col_s1, col_s2, col_s3 = st.columns(3)
                 with col_s1:
                     st.metric("平均MAPE", f"{sensitivity_results['avg_mape']:.2f}%")
@@ -2143,7 +2143,7 @@ def render_pricing_model_page():
                                             xaxis_title="样本索引",
                                             yaxis_title="价格",
                                             height=400)
-                st.plotly_chart(fig_uncertainty, use_container_width=True)
+                st.plotly_chart(fig_uncertainty, width='stretch')
         except Exception as e:
             st.info(f"置信区间计算: {str(e)[:80]}")
 
@@ -2225,9 +2225,9 @@ def render_pricing_model_page():
                         lag_vs_pure_fig = plot_lag_vs_pure_comparison(
                             lag_mape=actual_mape, pure_mape=avg_pure_mape
                         )
-                        st.plotly_chart(lag_vs_pure_fig, use_container_width=True)
+                        st.plotly_chart(lag_vs_pure_fig, width='stretch')
                         pure_df = pd.DataFrame(pure_results['windows'])
-                        st.dataframe(pure_df, use_container_width=True, height=200)
+                        st.dataframe(pure_df, width='stretch', height=200)
                         st.info(f"📋 **纯预测验证结论**: {pure_results.get('conclusion', '计算完成')}")
                         st.session_state.pure_prediction_results = pure_results
                     else:
@@ -2305,7 +2305,7 @@ def render_pricing_model_page():
                             'MAPE(%)': [base_mape] + noise_mapes + drop_mapes + label_mapes,
                             'MAPE增量(%)': [0] + [m - base_mape for m in noise_mapes] + [m - base_mape for m in drop_mapes] + [m - base_mape for m in label_mapes]
                         })
-                        st.dataframe(robust_df.set_index('测试类型'), use_container_width=True)
+                        st.dataframe(robust_df.set_index('测试类型'), width='stretch')
                         st.info(f"🛡️ **鲁棒性结论**: 模型在输入噪声、特征扰动和标签扰动下MAPE增量均较小，证明模型具有较强泛化能力，非过拟合")
                     else:
                         st.warning("请先训练定价模型")
@@ -2389,7 +2389,7 @@ def render_risk_assessment():
         col_gauge, col_info = st.columns([1, 1])
         with col_gauge:
             gauge_fig = plot_risk_dashboard(composite_score, risk_level)
-            st.plotly_chart(gauge_fig, use_container_width=True)
+            st.plotly_chart(gauge_fig, width='stretch')
         with col_info:
             level_colors = {'low': '🟢', 'medium': '🟡', 'high': '🟠', 'extreme': '🔴'}
             icon = level_colors.get(risk_level, '⚪')
@@ -2410,7 +2410,7 @@ def render_risk_assessment():
         col_radar, _ = st.columns([1, 1])
         with col_radar:
             radar_fig = plot_risk_radar(dim_scores)
-            st.plotly_chart(radar_fig, use_container_width=True)
+            st.plotly_chart(radar_fig, width='stretch')
         recent_dates = df_processed.index[-min(90, len(df_processed)):] if isinstance(df_processed.index, pd.DatetimeIndex) else range(min(90, len(df_processed)))
         n_trend = min(30, len(df_processed) // 3)
         if hasattr(risk_assessor, 'history_') and len(risk_assessor.history_) > n_trend:
@@ -2423,7 +2423,7 @@ def render_risk_assessment():
             else:
                 trend_scores = [composite_score] * n_trend
         trend_fig = plot_risk_trend(list(range(len(trend_scores))), trend_scores)
-        st.plotly_chart(trend_fig, use_container_width=True)
+        st.plotly_chart(trend_fig, width='stretch')
     except Exception as e:
         st.session_state.risk_running = False
         st.error(f"❌ 风险评估模块加载失败: {type(e).__name__}: {e}")
@@ -2450,7 +2450,7 @@ def render_report_generation():
         st.markdown("一键生成完整的研究报告，包含所有分析结果。")
         col_gen, _ = st.columns([2, 1])
         with col_gen:
-            gen_report = st.button("📄 生成研究报告", type="primary", use_container_width=True)
+            gen_report = st.button("📄 生成研究报告", type="primary", width='stretch')
         if gen_report:
             st.session_state.report_running = True
             
@@ -2901,15 +2901,15 @@ with tab6:
                             st.markdown("#### 📊 品种间风险传导矩阵")
                             cm = spillover_result['connectedness_matrix']
                             styled_cm = cm.style.format("{:.4f}").background_gradient(cmap='YlOrRd', axis=None)
-                            st.dataframe(styled_cm, use_container_width=True)
+                            st.dataframe(styled_cm, width='stretch')
 
                             st.markdown("#### 📤 前5大风险传播者")
                             transmitters = conductor.get_top_risk_transmitters(5)
-                            st.dataframe(transmitters, use_container_width=True, hide_index=True)
+                            st.dataframe(transmitters, width='stretch', hide_index=True)
 
                             st.markdown("#### 📥 前5大风险接收者")
                             receivers = conductor.get_top_risk_receivers(5)
-                            st.dataframe(receivers, use_container_width=True, hide_index=True)
+                            st.dataframe(receivers, width='stretch', hide_index=True)
 
                             st.markdown("#### 🔥 风险传染路径检测")
                             shock_sym = st.selectbox("选择冲击品种", core_syms,
@@ -2922,13 +2922,13 @@ with tab6:
                                     cp_df = pd.DataFrame(contagion['contagion_paths'])
                                     cp_df['to_name'] = cp_df['to'].map(SYMBOL_NAMES)
                                     st.dataframe(cp_df[['from', 'to', 'to_name', 'spillover', 'strength']],
-                                                 use_container_width=True, hide_index=True)
+                                                 width='stretch', hide_index=True)
                                 if contagion['second_order_paths']:
                                     st.markdown("**二阶传染路径(前5条)**:")
                                     so_df = pd.DataFrame(contagion['second_order_paths'][:5])
                                     so_df['to_name'] = so_df['to'].map(SYMBOL_NAMES)
                                     st.dataframe(so_df[['from', 'to', 'to_name', 'via', 'spillover', 'total_path_strength']],
-                                                 use_container_width=True, hide_index=True)
+                                                 width='stretch', hide_index=True)
 
                             st.caption(f"方法来源: {spillover_result['source']}")
                         else:
@@ -2978,7 +2978,7 @@ with tab6:
                     '金额(元/亩)': list(decomp['components'].values()),
                     '占比(%)': list(decomp['ratios'].values())
                 })
-                st.dataframe(comp_df, use_container_width=True, hide_index=True)
+                st.dataframe(comp_df, width='stretch', hide_index=True)
 
                 st.markdown("#### 📈 保费调整路径")
                 path_data = {
@@ -2992,7 +2992,7 @@ with tab6:
                         decomp['final_premium']
                     ]
                 }
-                st.dataframe(pd.DataFrame(path_data), use_container_width=True, hide_index=True)
+                st.dataframe(pd.DataFrame(path_data), width='stretch', hide_index=True)
 
                 st.caption(f"合规依据: {decomp['compliance']}")
                 st.caption(f"监管依据: {decomp['regulatory_basis']}")
@@ -3033,7 +3033,7 @@ with tab6:
                             "—", f"↓{imp_cd['search_space_reduction_pct']:.1f}%", "—"
                         ]
                     })
-                    st.dataframe(cd_compare_df.set_index('指标'), use_container_width=True)
+                    st.dataframe(cd_compare_df.set_index('指标'), width='stretch')
                     st.success(f"✅ Agri-PC 相比 Standard PC：F1提升{imp_cd['f1_gain']:.4f}，搜索空间缩减{imp_cd['search_space_reduction_pct']:.1f}%")
                 except Exception as e:
                     st.warning(f"因果发现对比未完成: {str(e)[:100]}")
@@ -3087,7 +3087,7 @@ with tab6:
                             ]
 
                         ce_compare_df = pd.DataFrame(ce_rows)
-                        st.dataframe(ce_compare_df.set_index('指标'), use_container_width=True)
+                        st.dataframe(ce_compare_df.set_index('指标'), width='stretch')
                         if imp_ce:
                             st.success(f"✅ ACML 相比 T-Learner：MAPE降低{imp_ce.get('mape_reduction_pct', 0):.1f}%，极端天气误差降低{imp_ce.get('extreme_error_reduction_pct', 0):.1f}%")
                     else:
@@ -3113,7 +3113,7 @@ with tab6:
     st.caption("与2023-2025年5篇CSSCI核心期刊农险定价模型的系统对比")
     try:
         cssci_df = generate_cssci_comparison_table()
-        st.dataframe(cssci_df, use_container_width=True, height=300)
+        st.dataframe(cssci_df, width='stretch', height=300)
         with st.expander("📄 CSSCI对标详细报告"):
             cssci_md = generate_cssci_markdown()
             st.markdown(cssci_md)
@@ -3134,7 +3134,7 @@ with tab6:
                     st.markdown("#### Agri-PC 逐约束消融")
                     if agri_pc_result.get('results'):
                         ablation_df = pd.DataFrame(agri_pc_result['results'])
-                        st.dataframe(ablation_df, use_container_width=True)
+                        st.dataframe(ablation_df, width='stretch')
                     st.info(agri_pc_result.get('summary', ''))
                 with st.spinner("ACML逐创新点消融..."):
                     target_col = 'close'
@@ -3149,7 +3149,7 @@ with tab6:
                         st.markdown("#### ACML 逐创新点消融")
                         if acml_result.get('results'):
                             acml_abl_df = pd.DataFrame(acml_result['results'])
-                            st.dataframe(acml_abl_df, use_container_width=True)
+                            st.dataframe(acml_abl_df, width='stretch')
                         st.info(acml_result.get('summary', ''))
                 with st.spinner("CCP逐创新点消融..."):
                     target_col = 'close'
@@ -3164,7 +3164,7 @@ with tab6:
                         st.markdown("#### CCP 逐创新点消融")
                         if ccp_result.get('results'):
                             ccp_abl_df = pd.DataFrame(ccp_result['results'])
-                            st.dataframe(ccp_abl_df, use_container_width=True)
+                            st.dataframe(ccp_abl_df, width='stretch')
                         st.info(ccp_result.get('summary', ''))
             else:
                 st.warning("请先在「数据探索」或「因果分析」页面加载数据")
@@ -3232,7 +3232,7 @@ with tab7:
                 {"项目": "特征维度", "值": "28维", "说明": "行情+宏观+天气+遥感"},
                 {"项目": "数据来源", "值": "4类", "说明": "交易所/统计局/气象局/FAO"},
             ]
-            st.dataframe(pd.DataFrame(overview_data), use_container_width=True)
+            st.dataframe(pd.DataFrame(overview_data), width='stretch')
 
 with tab8:
     st.markdown("---")
@@ -3278,7 +3278,7 @@ with tab9:
             model_mape_default = 3.0
         model_mape = st.slider("模型MAPE(%)", min_value=0.1, max_value=5.0, value=model_mape_default, step=0.1, key="sv_mape")
         sv_df = svc.calculate_all_symbols(model_mape=model_mape)
-        st.dataframe(sv_df, use_container_width=True, height=450)
+        st.dataframe(sv_df, width='stretch', height=450)
         col_sv1, col_sv2, col_sv3 = st.columns(3)
         with col_sv1:
             avg_prem_reduction = sv_df['保费降低(%)'].mean()
@@ -3338,7 +3338,7 @@ with tab10:
         st.markdown("---")
         st.subheader("📋 参考费率表")
         rates_df = pc.get_reference_rates()
-        st.dataframe(rates_df, use_container_width=True)
+        st.dataframe(rates_df, width='stretch')
     except Exception as e:
         st.error(f"保费厘定模块: {str(e)[:150]}")
 
@@ -3434,6 +3434,6 @@ with tab12:
              '种植面积(万亩)': v['planting_area_10k']}
             for k, v in PROVINCE_INSURANCE_DATA.items()
         ])
-        st.dataframe(prov_df, use_container_width=True)
+        st.dataframe(prov_df, width='stretch')
     except Exception as e:
         st.error(f"政策评估模块: {str(e)[:150]}")
