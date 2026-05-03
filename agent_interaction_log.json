@@ -16,9 +16,9 @@
       "primary_use": "算法设计与文档撰写"
     },
     {
-      "agent_name": "MiniMax",
-      "agent_type": "LLM对话助手",
-      "access_method": "API",
+      "agent_name": "豆包",
+      "agent_type": "LLM对话助手(思考模式)",
+      "access_method": "电脑客户端",
       "usage_period": "2026年1月 - 2026年4月",
       "primary_use": "数据分析与可视化"
     }
@@ -57,7 +57,7 @@
     {
       "session_id": "session_004",
       "date": "2026-01-15",
-      "agent": "MiniMax",
+      "agent": "豆包",
       "task": "数据可视化与Streamlit界面",
       "user_input": "请帮我设计Streamlit应用界面，需要展示因果图、定价结果、风险评估等12个功能模块",
       "agent_output": "提供了Streamlit多Tab布局和Plotly图表代码",

@@ -14,7 +14,7 @@ class DemoScript:
                 'step': 1,
                 'title': '数据加载与预处理',
                 'description': (
-                    '加载96个CSV数据文件，涵盖13个农产品期货品种的日频行情、'
+                    '加载48个CSV数据文件（36期货+7天气+4遥感+1宏观），涵盖13个农产品期货品种的日频行情、'
                     '天气指标、宏观经济数据和遥感指数。展示数据加载进度条和'
                     '数据概览面板（记录数、字段数、时间跨度）。'
                 ),
@@ -172,7 +172,7 @@ class DemoScript:
                     'phase': '开场与数据展示',
                     'steps': [1, 2],
                     'duration_minutes': 1.2,
-                    'key_message': '数据基础扎实，96个CSV覆盖多源异构数据',
+                    'key_message': '数据基础扎实，48个CSV覆盖多源异构数据',
                 },
                 {
                     'phase': '核心算法展示',
@@ -207,7 +207,7 @@ class DemoScript:
                 'scenario': '网络故障导致在线数据源不可用',
                 'detection': '连接超时>10秒或HTTP状态码非200',
                 'strategy': (
-                    '1. 自动切换到本地缓存数据（96个CSV已预加载）\n'
+                    '1. 自动切换到本地缓存数据（48个CSV已预加载）\n'
                     '2. 展示离线分析结果（预生成的图表和报告）\n'
                     '3. 使用streamlit缓存机制(@st.cache_data)避免重复请求\n'
                     '4. 若Streamlit Cloud不可用，切换到本地演示模式'

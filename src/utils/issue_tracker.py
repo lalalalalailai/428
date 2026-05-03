@@ -7,7 +7,7 @@ ISSUE_REGISTRY = [
         "description": "cannot import name 'AlgorithmComparison' from 'models.algorithm_comparison'",
         "root_cause": "models/algorithm_comparison.py 中不存在 AlgorithmComparison 类，该模块仅导出函数 compare_causal_discovery / compare_causal_estimation，调用方使用了错误的类名",
         "solution": "将调用方 from models.algorithm_comparison import AlgorithmComparison 改为 from models.algorithm_comparison import compare_causal_discovery, compare_causal_estimation",
-        "status": "pending",
+        "status": "fixed",
         "verification_method": "运行 python -c \"from models.algorithm_comparison import compare_causal_discovery, compare_causal_estimation\" 无报错"
     },
     {
@@ -17,7 +17,7 @@ ISSUE_REGISTRY = [
         "description": "cannot import name 'ACMLCausalEstimator' from 'models.acml'",
         "root_cause": "models/acml.py 中类名为 ACML 而非 ACMLCausalEstimator，调用方使用了不存在的类名",
         "solution": "将调用方 from models.acml import ACMLCausalEstimator 改为 from models.acml import ACML",
-        "status": "pending",
+        "status": "fixed",
         "verification_method": "运行 python -c \"from models.acml import ACML\" 无报错"
     },
     {
@@ -27,7 +27,7 @@ ISSUE_REGISTRY = [
         "description": "cannot import name 'PolicyEvaluation' from 'models.policy_evaluation'",
         "root_cause": "models/policy_evaluation.py 中类名为 PolicyEvaluator 而非 PolicyEvaluation，调用方使用了错误的类名",
         "solution": "将调用方 from models.policy_evaluation import PolicyEvaluation 改为 from models.policy_evaluation import PolicyEvaluator",
-        "status": "pending",
+        "status": "fixed",
         "verification_method": "运行 python -c \"from models.policy_evaluation import PolicyEvaluator\" 无报错"
     },
     {
@@ -37,7 +37,7 @@ ISSUE_REGISTRY = [
         "description": "cannot import name 'AgriPC' from 'models.causal_discovery'",
         "root_cause": "AgriPC 类定义在 models/agri_pc.py 中而非 models/causal_discovery.py，causal_discovery.py 仅导出 CausalDiscovery 和 CausalGraph",
         "solution": "将调用方 from models.causal_discovery import AgriPC 改为 from models.agri_pc import AgriPC",
-        "status": "pending",
+        "status": "fixed",
         "verification_method": "运行 python -c \"from models.agri_pc import AgriPC\" 无报错"
     },
     {
@@ -57,7 +57,7 @@ ISSUE_REGISTRY = [
         "description": "cannot import name 'CCPModel' from 'models.ccp'",
         "root_cause": "models/ccp.py 中类名为 CausalConformalPricing 而非 CCPModel，verify_fixes.py 使用了错误的类名",
         "solution": "将 from models.ccp import CCPModel 改为 from models.ccp import CausalConformalPricing",
-        "status": "pending",
+        "status": "fixed",
         "verification_method": "运行 python -c \"from models.ccp import CausalConformalPricing\" 无报错"
     },
     {
@@ -67,7 +67,7 @@ ISSUE_REGISTRY = [
         "description": "cannot import name 'ACMLModel' from 'models.acml'",
         "root_cause": "models/acml.py 中类名为 ACML 而非 ACMLModel，verify_fixes.py 使用了错误的类名",
         "solution": "将 from models.acml import ACMLModel 改为 from models.acml import ACML",
-        "status": "pending",
+        "status": "fixed",
         "verification_method": "运行 python -c \"from models.acml import ACML\" 无报错"
     },
     {
@@ -157,7 +157,7 @@ ISSUE_REGISTRY = [
         "description": "参赛要求: 必须使用15款国产免费AI工具或自研AI工具，本项目使用豆包AI需在文档中明确声明",
         "root_cause": "参赛要求第五章规定只能使用指定AI工具，需在 AI工具使用说明(04-3模板) 中填写豆包AI的使用详情",
         "solution": "按04-3模板填写豆包AI使用说明，包含: 工具名称/版本/访问方式/使用时间/使用环节/Prompt/AI回复/人工修改/采纳比例",
-        "status": "pending",
+        "status": "fixed",
         "verification_method": "检查 03_设计与开发文档/ 目录下是否存在 AI工具使用说明.docx 且包含豆包AI条目"
     },
     {
@@ -187,7 +187,7 @@ ISSUE_REGISTRY = [
         "description": "参赛要求: 必须提交智能体交互记录 agent_interaction_log.json (2026年新增)",
         "root_cause": "2026年大赛新增要求，涉及AI Agent应用的队伍必须提交交互记录，展示智能体在需求理解/方法建议/代码生成/结果解释中的贡献",
         "solution": "整理与豆包AI的交互记录，按 JSON 格式保存为 agent_interaction_log.json，包含 session_id/messages(role+content) 等字段",
-        "status": "pending",
+        "status": "fixed",
         "verification_method": "检查 02素材与源码/ 目录下是否存在 agent_interaction_log.json 且格式符合规范"
     },
     {
@@ -217,7 +217,7 @@ ISSUE_REGISTRY = [
         "description": "参赛要求: 源码提交不得包含编译中间产物(.pyc, __pycache__, node_modules等)",
         "root_cause": "提交前需清理所有 __pycache__ 目录、.pyc 文件、.pyo 文件等编译中间产物",
         "solution": "运行 find . -type d -name __pycache__ -exec rm -rf {} + 和 find . -name '*.pyc' -delete 清理中间产物",
-        "status": "pending",
+        "status": "fixed",
         "verification_method": "检查 02素材与源码/src/ 目录下不存在 __pycache__ 目录和 .pyc 文件"
     },
     {
