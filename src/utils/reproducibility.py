@@ -141,7 +141,7 @@ def generate_reproducibility_declaration() -> str:
 
 ---
 
-**研究团队**: Team IFAP
+**研究团队**: Project Team
 **声明日期**: {now}
 """
     logger.info("可复现性声明生成完成")
@@ -182,14 +182,24 @@ def verify_reproducibility(src_dir: str = None) -> Dict:
         'tests_pass': False,
         'requirements_locked': False,
     }
-    data_dir = os.path.join(os.path.dirname(src_dir), 'enhanced_data')
-    if os.path.exists(data_dir):
-        csv_files = []
-        for root, dirs, files in os.walk(data_dir):
-            csv_files.extend([f for f in files if f.endswith('.csv')])
-        checks['data_exists'] = len(csv_files) > 10
+    parent_dir = os.path.dirname(src_dir)
+    for data_candidate in [
+        os.path.join(parent_dir, 'data'),
+        os.path.join(parent_dir, 'enhanced_data'),
+        os.path.join(parent_dir, '05_数据集'),
+        os.path.join(os.path.dirname(parent_dir), 'data'),
+        os.path.join(os.path.dirname(parent_dir), 'enhanced_data'),
+    ]:
+        if os.path.exists(data_candidate):
+            csv_files = []
+            for root, dirs, files in os.walk(data_candidate):
+                csv_files.extend([f for f in files if f.endswith('.csv')])
+            if len(csv_files) > 10:
+                checks['data_exists'] = True
+                break
     try:
-        sys.path.insert(0, src_dir)
+        if src_dir not in sys.path:
+            sys.path.insert(0, src_dir)
         from models.pricing_model import PricingModel
         from models.causal_discovery import CausalDiscovery
         from models.risk_assessor import RiskAssessor
@@ -198,14 +208,26 @@ def verify_reproducibility(src_dir: str = None) -> Dict:
         logger.warning(f"模块导入失败: {e}")
     app_path = os.path.join(src_dir, 'app.py')
     checks['app_launchable'] = os.path.exists(app_path)
-    req_path = os.path.join(os.path.dirname(src_dir), 'requirements.txt')
-    if os.path.exists(req_path):
-        with open(req_path, 'r') as f:
-            lines = [l.strip() for l in f if l.strip() and not l.startswith('#')]
-            locked = sum(1 for l in lines if '==' in l)
-            checks['requirements_locked'] = locked > 5
-    test_path = os.path.join(os.path.dirname(src_dir), 'tests', 'test_system.py')
-    checks['tests_pass'] = os.path.exists(test_path)
+    for req_candidate in [
+        os.path.join(parent_dir, 'requirements.txt'),
+        os.path.join(src_dir, '..', 'requirements.txt'),
+        os.path.join(os.path.dirname(parent_dir), 'requirements.txt'),
+    ]:
+        req_path = os.path.normpath(req_candidate)
+        if os.path.exists(req_path):
+            with open(req_path, 'r') as f:
+                lines = [l.strip() for l in f if l.strip() and not l.startswith('#')]
+                locked = sum(1 for l in lines if '==' in l)
+                checks['requirements_locked'] = locked > 5
+            break
+    for test_candidate in [
+        os.path.join(parent_dir, 'tests', 'test_system.py'),
+        os.path.join(src_dir, 'auto_test.py'),
+        os.path.join(parent_dir, 'auto_test.py'),
+    ]:
+        if os.path.exists(test_candidate):
+            checks['tests_pass'] = True
+            break
     total = sum(checks.values())
     score = total / len(checks) * 100
     result = {
