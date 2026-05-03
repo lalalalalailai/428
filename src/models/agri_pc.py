@@ -46,7 +46,7 @@ Agri-PC: 农险时序因果发现算法 (Agricultural Temporal Causal Discovery)
       Nearest-Neighbor Estimator of Conditional Mutual Information.
       AISTATS.
 
-Author: Team IFAP
+Author: Project Team
 Date: 2026-04
 """
 
@@ -88,8 +88,8 @@ AGRI_TEMPORAL_ORDER = {
     'futures_high': 5,
     'futures_low': 5,
     'settle': 5,
-    'close': 6,
-    'risk_premium': 7,
+    'close': 5,
+    'risk_premium': 6,
     'basis': 4,
     'delivery_pressure': 3,
 }

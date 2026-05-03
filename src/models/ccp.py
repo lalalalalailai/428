@@ -38,7 +38,7 @@ CCP: 因果保形预测定价框架 (Causal-Conformal Pricing)
   [3] Gibbs, I. & Candes, E. (2021). Adaptive Conformal Regression
       Under Distribution Shift. NeurIPS.
 
-Author: Team IFAP
+Author: Project Team
 Date: 2026-04
 """
 
@@ -177,10 +177,14 @@ class CausalConformalPricing:
                 if X_features is not None and n_train > 50:
                     X_arr_full = X_features.values if hasattr(X_features, 'values') else X_features
                     distribution_weights = _compute_distribution_weights(X_arr_full[train_idx], X_arr_full[calib_idx])
-                    weighted_scores = conformity_scores * distribution_weights
+                    sorted_idx = np.argsort(conformity_scores)
+                    sorted_scores = conformity_scores[sorted_idx]
+                    sorted_weights = distribution_weights[sorted_idx]
+                    cum_weights = np.cumsum(sorted_weights)
+                    cum_weights /= cum_weights[-1]
                     q_level = np.ceil((1 - self.alpha) * (n_calib + 1)) / n_calib
                     q_level = min(q_level, 1.0)
-                    self._conformity_quantile = np.quantile(weighted_scores, q_level)
+                    self._conformity_quantile = sorted_scores[np.searchsorted(cum_weights, q_level)]
                     self._distribution_weights = distribution_weights
                     logger.info(f"应用分布偏移加权: 均值权重={np.mean(distribution_weights):.4f}")
                 else:
@@ -207,21 +211,15 @@ class CausalConformalPricing:
         rng = np.random.RandomState(self.random_state)
         calib_idx = rng.choice(n, size=n_calib, replace=False)
 
-        self._calibration_scores = np.abs(causal_residuals[calib_idx])
-
+        calibration_scores = np.abs(causal_residuals[calib_idx])
         q_level = np.ceil((1 - self.alpha) * (n_calib + 1)) / n_calib
         q_level = min(q_level, 1.0)
-
-        self._quantile_lower = np.percentile(
-            causal_residuals[calib_idx], self.alpha / 2 * 100
-        )
-        self._quantile_upper = np.quantile(
-            causal_residuals[calib_idx], q_level
-        )
+        self._conformity_quantile = np.quantile(calibration_scores, q_level)
+        self._quantile_lower = -self._conformity_quantile
+        self._quantile_upper = self._conformity_quantile
         self._use_cqr = False
         self._q_low_model = None
         self._q_high_model = None
-        self._conformity_quantile = None
 
         self._fitted = True
 
@@ -287,7 +285,7 @@ class CausalConformalPricing:
         动态调整覆盖水平:
         α_{t+1} = α_t + γ × (1 - 1{Y_t ∈ Ĉ_t})
 
-        若真实值在区间内: α减小(区间变宽)
+        若真实值在区间内: α保持不变
         若真实值在区间外: α增大(区间变窄)
 
         Returns:

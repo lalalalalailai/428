@@ -35,19 +35,16 @@ class DataLoader:
 
     def load_futures_data(self, symbol: str,
                            parse_dates: bool = True) -> pd.DataFrame:
-        # 尝试从磁盘缓存加载
         cache_key = get_cache_key('futures', symbol, parse_dates=parse_dates)
         cached_data = load_cache(cache_key)
         if cached_data is not None:
             logger.info(f"从缓存加载期货数据: {SYMBOL_NAMES.get(symbol, symbol)}")
             return cached_data
         
-        # 内存缓存检查
         mem_cache_key = f'futures_{symbol}_{parse_dates}'
         if mem_cache_key in self._cache:
             return self._cache[mem_cache_key].copy()
         
-        # 从文件加载
         path = config.get_futures_path(symbol)
         if not os.path.exists(path):
             logger.warning(f"数据文件不存在: {path}")
@@ -62,28 +59,30 @@ class DataLoader:
             df.set_index('date', inplace=True)
             df.sort_index(inplace=True)
         
-        # 保存到内存缓存
+        price_cols = ['open', 'high', 'low', 'close', 'settle']
+        for col in price_cols:
+            if col in df.columns:
+                df[col] = df[col].replace(0, np.nan)
+        if 'hold' in df.columns:
+            df['hold'] = df['hold'].replace(0, np.nan)
+        
         self._cache[mem_cache_key] = df.copy()
-        # 保存到磁盘缓存
         save_cache(cache_key, df)
         
         logger.info(f"加载期货数据: {SYMBOL_NAMES.get(symbol, symbol)} ({len(df)} 行)")
         return df
 
     def load_macro_data(self) -> pd.DataFrame:
-        # 尝试从磁盘缓存加载
         cache_key = get_cache_key('macro', 'all')
         cached_data = load_cache(cache_key)
         if cached_data is not None:
             logger.info("从缓存加载宏观数据")
             return cached_data
         
-        # 内存缓存检查
         mem_cache_key = 'macro_all'
         if mem_cache_key in self._cache:
             return self._cache[mem_cache_key].copy()
         
-        # 从文件加载
         macro_dir = config.macro_dir
         if not os.path.exists(macro_dir):
             logger.warning(f"宏观数据目录不存在: {macro_dir}")
@@ -124,23 +123,19 @@ class DataLoader:
                     logger.warning(f"读取宏观文件失败 {fname}: {e}")
         result = pd.DataFrame(rows)
         
-        # 保存到内存缓存
         self._cache[mem_cache_key] = result
-        # 保存到磁盘缓存
         save_cache(cache_key, result)
         
         logger.info(f"加载宏观数据: {len(rows)} 个指标")
         return result
 
     def load_macro_raw(self, indicator: str) -> pd.DataFrame:
-        # 尝试从磁盘缓存加载
         cache_key = get_cache_key('macro_raw', indicator)
         cached_data = load_cache(cache_key)
         if cached_data is not None:
             logger.info(f"从缓存加载宏观原始数据: {indicator}")
             return cached_data
         
-        # 从文件加载
         macro_dir = config.macro_dir
         fname = f"{indicator}.csv"
         fpath = os.path.join(macro_dir, fname)
@@ -148,25 +143,21 @@ class DataLoader:
             return pd.DataFrame()
         df = pd.read_csv(fpath, encoding='utf-8-sig')
         
-        # 保存到磁盘缓存
         save_cache(cache_key, df)
         
         return df
 
     def load_weather_data(self, province_name: str) -> pd.DataFrame:
-        # 尝试从磁盘缓存加载
         cache_key = get_cache_key('weather', province_name)
         cached_data = load_cache(cache_key)
         if cached_data is not None:
             logger.info(f"从缓存加载天气数据: {province_name}")
             return cached_data
         
-        # 内存缓存检查
         mem_cache_key = f'weather_{province_name}'
         if mem_cache_key in self._cache:
             return self._cache[mem_cache_key].copy()
         
-        # 从文件加载
         weather_dir = config.weather_dir
         filename = PROVINCE_FILES.get(province_name)
         if not filename:
@@ -181,23 +172,19 @@ class DataLoader:
             df['date'] = pd.to_datetime(df['date'])
             df.set_index('date', inplace=True)
         
-        # 保存到内存缓存
         self._cache[mem_cache_key] = df.copy()
-        # 保存到磁盘缓存
         save_cache(cache_key, df)
         
         logger.info(f"加载天气数据: {province_name} ({len(df)} 行)")
         return df
 
     def load_extended_factors(self) -> Dict[str, pd.DataFrame]:
-        # 尝试从磁盘缓存加载
         cache_key = get_cache_key('extended', 'factors')
         cached_data = load_cache(cache_key)
         if cached_data is not None:
             logger.info("从缓存加载扩展因子数据")
             return cached_data
         
-        # 从文件加载
         extended_dir = config.extended_dir
         result = {}
         if not os.path.exists(extended_dir):
@@ -212,20 +199,17 @@ class DataLoader:
                 except Exception:
                     pass
         
-        # 保存到磁盘缓存
         save_cache(cache_key, result)
         
         return result
 
     def get_available_symbols(self) -> List[str]:
-        # 尝试从磁盘缓存加载
         cache_key = get_cache_key('symbols', 'available')
         cached_data = load_cache(cache_key)
         if cached_data is not None:
             logger.info("从缓存加载可用品种列表")
             return cached_data
         
-        # 从文件系统加载
         futures_dir = config.futures_dir
         if not os.path.exists(futures_dir):
             return []
@@ -236,20 +220,17 @@ class DataLoader:
                 symbols.append(code)
         symbols = sorted(symbols)
         
-        # 保存到磁盘缓存
         save_cache(cache_key, symbols)
         
         return symbols
 
     def data_summary(self) -> pd.DataFrame:
-        # 尝试从磁盘缓存加载
         cache_key = get_cache_key('summary', 'data')
         cached_data = load_cache(cache_key)
         if cached_data is not None:
             logger.info("从缓存加载数据摘要")
             return cached_data
         
-        # 生成摘要
         symbols = self.get_available_symbols()
         rows = []
         for sym in symbols[:5]:
@@ -265,7 +246,6 @@ class DataLoader:
                 })
         result = pd.DataFrame(rows)
         
-        # 保存到磁盘缓存
         save_cache(cache_key, result)
         
         return result

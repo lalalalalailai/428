@@ -4,7 +4,7 @@
 本文件为三大原创算法(Agri-PC, ACML, CCP)的六大定理提供严格数学证明链路。
 每个定理遵循：假设→引理→证明→推论 的完整结构。
 
-Author: Team IFAP
+Author: Project Team
 Date: 2026-04
 """
 

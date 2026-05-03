@@ -125,7 +125,7 @@ class DataQualityChecker:
             large_gaps = (gap_days > max_gap_days).sum()
 
         max_gap = gap_days.max() if len(gap_days) > 0 else 0
-        median_gap = gap_days.median() if len(gap_days) > 0 else 0
+        median_gap = pd.Series(gap_days).median() if len(gap_days) > 0 else 0
 
         report = {
             'name': name,

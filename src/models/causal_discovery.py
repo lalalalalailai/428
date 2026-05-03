@@ -302,13 +302,13 @@ class CausalDiscovery:
         from sklearn.linear_model import LinearRegression
         residuals_x = data[x].copy()
         residuals_y = data[y].copy()
-        for z_var in z:
-            if data[z_var].std() == 0:
-                continue
-            lr_x = LinearRegression().fit(data[[z_var]], residuals_x)
-            residuals_x = residuals_x - lr_x.predict(data[[z_var]])
-            lr_y = LinearRegression().fit(data[[z_var]], residuals_y)
-            residuals_y = residuals_y - lr_y.predict(data[[z_var]])
+        valid_z = [z_var for z_var in z if data[z_var].std() > 0]
+        if valid_z:
+            Z = data[valid_z].values
+            lr_x = LinearRegression().fit(Z, residuals_x)
+            residuals_x = residuals_x - lr_x.predict(Z)
+            lr_y = LinearRegression().fit(Z, residuals_y)
+            residuals_y = residuals_y - lr_y.predict(Z)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=stats.ConstantInputWarning)
             if np.std(residuals_x) < 1e-10 or np.std(residuals_y) < 1e-10:

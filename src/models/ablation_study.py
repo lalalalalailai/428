@@ -7,7 +7,7 @@
 这是国赛评委最关注的实验之一：
 "如果去掉你这个创新点，效果会差多少？"
 
-Author: Team IFAP
+Author: Project Team
 Date: 2026-04
 """
 

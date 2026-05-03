@@ -8,7 +8,7 @@ C. 新增改进函数(pure_prediction/数据驱动系数/定理证明/消融实�
 D. 数据规模声明(36品种/53,058记录/12模块)与实际一致
 E. 系统文件完整性(start.bat/Dockerfile/docker-compose.yml等)
 
-Author: Team IFAP
+Author: Project Team
 Date: 2026-04-23
 Version: v2.0 (扩充版研究报告一致性验证)
 """
@@ -290,7 +290,7 @@ class TestSystemFilesCompleteness(unittest.TestCase):
         
     def test_judge_report_exists(self):
         """评委评审报告存在"""
-        path = os.path.join(self.BASE_DIR, '04_源码及说明', '国奖省奖总评委深度评审报告.docx')
+        path = os.path.join(self.BASE_DIR, '04_源码及说明', '评审报告.docx')
         self.assertTrue(os.path.exists(path), f"评委评审报告不存在于 {path}")
 
     def test_ai_compliance_exists(self):

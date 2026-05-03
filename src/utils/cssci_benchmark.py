@@ -329,3 +329,74 @@ def generate_efficiency_comparison() -> str:
 **结论**: ACML在精度与效率间达到最优平衡，适合在线实时定价场景部署。
 """
     return efficiency
+
+
+def literature_coverage_check() -> Dict:
+    from utils.literature_db import (
+        LITERATURE_DB,
+        ALGORITHM_DESCRIPTIONS,
+        MIN_LITERATURE_PER_ALGORITHM,
+        REQUIRED_FIELDS,
+        OPTIONAL_FIELDS,
+    )
+
+    result = {
+        "algorithms": {},
+        "overall_pass": True,
+        "summary": "",
+        "details": [],
+    }
+
+    for algo_name, papers in LITERATURE_DB.items():
+        algo_info = {
+            "paper_count": len(papers),
+            "count_pass": len(papers) >= MIN_LITERATURE_PER_ALGORITHM,
+            "fields_pass": True,
+            "missing_fields": [],
+            "doi_coverage": sum(1 for p in papers if p.get("doi")) / len(papers) if papers else 0,
+            "year_range": (min(p["year"] for p in papers), max(p["year"] for p in papers)) if papers else (0, 0),
+            "journals": list(set(p["journal"] for p in papers)),
+            "description": ALGORITHM_DESCRIPTIONS.get(algo_name, ""),
+        }
+
+        for i, paper in enumerate(papers):
+            for field in REQUIRED_FIELDS:
+                if field not in paper or not paper[field]:
+                    algo_info["fields_pass"] = False
+                    algo_info["missing_fields"].append(f"Paper#{i+1}: {field}")
+            for field in OPTIONAL_FIELDS:
+                if field not in paper or not paper[field]:
+                    algo_info["missing_fields"].append(f"Paper#{i+1}: {field}(optional)")
+
+        algo_pass = algo_info["count_pass"] and algo_info["fields_pass"]
+        algo_info["pass"] = algo_pass
+        if not algo_pass:
+            result["overall_pass"] = False
+
+        result["algorithms"][algo_name] = algo_info
+        result["details"].append(
+            f"[{algo_name}] {algo_info['paper_count']}篇文献 | "
+            f"数量{'✅' if algo_info['count_pass'] else '❌'} | "
+            f"必填字段完整{'✅' if algo_info['fields_pass'] else '❌'} | "
+            f"DOI覆盖率{algo_info['doi_coverage']:.0%} | "
+            f"年份{algo_info['year_range'][0]}-{algo_info['year_range'][1]} | "
+            f"期刊{algo_info['journals']}"
+        )
+
+    total_papers = sum(len(v) for v in LITERATURE_DB.values())
+    all_journals = set()
+    for papers in LITERATURE_DB.values():
+        for p in papers:
+            all_journals.add(p["journal"])
+
+    result["summary"] = (
+        f"三大算法文献覆盖检查: 共{total_papers}篇文献, "
+        f"覆盖{len(all_journals)}个期刊/会议, "
+        f"整体{'✅ 通过' if result['overall_pass'] else '❌ 未通过'}"
+    )
+
+    logger.info(result["summary"])
+    for detail in result["details"]:
+        logger.info(detail)
+
+    return result

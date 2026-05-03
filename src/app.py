@@ -59,6 +59,7 @@ from data.data_preprocessor import DataPreprocessor
 from data.feature_engineer import FeatureEngineer
 from models.causal_discovery import CausalDiscovery
 from models.causal_estimation import PSMEstimator, SLearner, TLearner, DMLEstimator, IVEstimator, placebo_test
+from models.causal_consensus import CausalConsensus
 from models.pricing_model import PricingModel, ablation_study, baseline_comparison, rolling_window_validate, generate_rolling_window_report
 from models.statistical_tests import diebold_mariano_test, white_reality_check, comprehensive_statistical_report, clark_west_test
 from models.ablation_fine_grained import agri_pc_ablation, acml_ablation, ccp_ablation, generate_ablation_report
@@ -68,6 +69,8 @@ from models.extreme_risk_warning import ExtremeRiskWarning
 from models.policy_evaluation import PolicyEvaluator, PROVINCE_INSURANCE_DATA
 from utils.cssci_benchmark import generate_cssci_comparison_table, generate_cssci_markdown, generate_academic_contribution_statement
 from utils.reproducibility import generate_reproducibility_declaration, verify_reproducibility
+from utils.performance_monitor import performance_monitor
+from utils.cache_utils import get_cache_stats, clear_cache
 from models.risk_assessor import RiskAssessor
 from visualization.plot_causal_graph import plot_causal_dag, plot_correlation_heatmap
 from visualization.plot_performance import (plot_model_performance,
@@ -84,6 +87,10 @@ from visualization.plot_3d_enhanced import (
     plot_3d_risk_radar_multi, render_dataset_overview, render_report_summary
 )
 from visualization.plot_utils import set_financial_theme
+from utils.ui_components import (MetricCard, StatusBadge, ProgressTracker,
+                                  DataPreviewTable, ChartContainer,
+                                  render_quick_analysis, render_error_guidance,
+                                  render_loading_placeholder)
 
 st.set_page_config(
     page_title="农险期货智能定价系统",
@@ -689,6 +696,33 @@ with st.sidebar:
     if st.button("🔄 刷新缓存"):
         st.session_state.data_loader.clear_cache()
         st.rerun()
+    with st.expander("⚡ 性能监控"):
+        try:
+            cache_stats = get_cache_stats()
+            st.markdown("#### 📦 缓存统计")
+            col_c1, col_c2, col_c3 = st.columns(3)
+            with col_c1:
+                st.metric("命中率", cache_stats['hit_rate'])
+            with col_c2:
+                st.metric("缓存文件数", cache_stats['cache_files'])
+            with col_c3:
+                st.metric("缓存大小", f"{cache_stats['cache_size_mb']:.1f}MB")
+            st.markdown(f"命中: {cache_stats['hits']} | 未命中: {cache_stats['misses']} | 保存: {cache_stats['saves']}")
+        except Exception:
+            st.info("缓存统计暂不可用")
+        st.markdown("---")
+        st.markdown("#### ⏱️ 操作耗时")
+        try:
+            perf_report = performance_monitor.generate_report()
+            st.markdown(perf_report)
+        except Exception:
+            st.info("暂无性能监控数据")
+        if st.button("🗑️ 清除缓存", key="clear_cache_btn"):
+            try:
+                clear_cache()
+                st.success("缓存已清除")
+            except Exception:
+                st.warning("清除缓存失败")
     st.markdown("---")
     st.markdown("*基于因果推断的智能定价模型 v1.0*")
 
@@ -709,7 +743,7 @@ def render_data_exploration():
         if data_type == "期货数据":
             df = loader.load_futures_data(selected_symbol)
             if df.empty:
-                st.error(f"❌ 未找到品种 {selected_symbol} 的数据，请检查数据目录")
+                render_error_guidance(f"未找到品种 {selected_symbol} 的数据，请检查数据目录")
                 return
             
             # 确保时间范围过滤生效
@@ -807,28 +841,16 @@ def render_data_exploration():
         if stats_dict:
             stats_df = pd.DataFrame(stats_dict).T
             st.dataframe(stats_df, use_container_width=True)
-        st.metric("总记录数", f"{len(df_filtered):,}")
-        st.metric("特征数", f"{len(df_filtered.columns)}")
+        col_mc1, col_mc2 = st.columns(2)
+        with col_mc1:
+            MetricCard("总记录数", f"{len(df_filtered):,}", color="primary").render()
+        with col_mc2:
+            MetricCard("特征数", f"{len(df_filtered.columns)}", color="info").render()
     with col_preview:
         st.subheader("🔍 数据预览")
         display_cols = df_filtered.columns.tolist()[:10]
-        preview_page_size = 100
-        total_rows = len(df_filtered)
-        total_pages = max(1, (total_rows + preview_page_size - 1) // preview_page_size)
-        col_pg1, col_pg2, col_pg3 = st.columns([1, 2, 1])
-        with col_pg1:
-            preview_page = st.number_input("页码", min_value=1, max_value=total_pages, value=1, key="preview_page")
-        with col_pg2:
-            st.caption(f"共 {total_rows:,} 条记录，每页 {preview_page_size} 条，共 {total_pages} 页")
-        with col_pg3:
-            year_filter = st.selectbox("年份筛选", ["全部"] + sorted(df_filtered.index.year.unique().tolist()) if isinstance(df_filtered.index, pd.DatetimeIndex) else ["全部"], key="preview_year")
-        if year_filter != "全部" and isinstance(df_filtered.index, pd.DatetimeIndex):
-            preview_df = df_filtered[df_filtered.index.year == year_filter][display_cols]
-        else:
-            preview_df = df_filtered[display_cols]
-        start_idx = (preview_page - 1) * preview_page_size
-        end_idx = min(start_idx + preview_page_size, len(preview_df))
-        st.dataframe(preview_df.iloc[start_idx:end_idx], use_container_width=True, height=350)
+        preview_df = df_filtered[display_cols]
+        DataPreviewTable(preview_df, page_size=100, key="data_preview_tab1").render()
     st.subheader("📉 价格走势图" if data_type == "期货数据" else ("🛰️ 遥感时序图" if data_type == "遥感数据" else "🌤️ 气象监测图"))
     try:
         from plotly.graph_objects import Figure, Scatter
@@ -999,6 +1021,9 @@ def render_data_exploration():
         st.warning(f"图表渲染异常: {str(e)[:150]}")
 
     st.markdown("---")
+
+    render_quick_analysis(selected_symbol, df_filtered)
+
     st.subheader("🔍 数据质量自动验证")
     st.caption("自动检查数据日期范围合规性、完整性、连续性、一致性和准确性")
     try:
@@ -1014,14 +1039,17 @@ def render_data_exploration():
         grade_color = {'A': '🟢', 'B': '🟡', 'C': '🟠', 'D': '🔴'}
         col_q1, col_q2, col_q3 = st.columns(3)
         with col_q1:
-            st.metric("数据质量评分", f"{overall['overall_score']:.1f}/100",
-                      delta=f"等级: {grade_color.get(overall['grade'], '⚪')}{overall['grade']}")
+            grade = overall['grade']
+            q_color = "success" if grade in ('A', 'B') else ("warning" if grade == 'C' else "danger")
+            MetricCard("数据质量评分", f"{overall['overall_score']:.1f}/100",
+                       delta=f"等级: {grade_color.get(grade, '⚪')}{grade}", color=q_color).render()
         with col_q2:
-            st.metric("检查维度", f"{overall['total_checks']}项")
+            MetricCard("检查维度", f"{overall['total_checks']}项", color="info").render()
         with col_q3:
             date_check = overall['details'].get(f'{selected_symbol}_date_range', {})
             compliance = "✅ 合规" if date_check.get('compliant', True) else "❌ 违规"
-            st.metric("日期范围合规", compliance)
+            c_status = "success" if date_check.get('compliant', True) else "danger"
+            MetricCard("日期范围合规", compliance, color=c_status).render()
         quality_rows = []
         for key, detail in overall['details'].items():
             quality_rows.append({
@@ -1129,6 +1157,7 @@ def _format_elapsed(seconds):
 
 def render_causal_analysis():
     st.header("🔗 因果分析")
+    performance_monitor.start_timer('causal_analysis')
     loader = st.session_state.data_loader
     preprocessor = st.session_state.preprocessor
     progress_bar = st.progress(0, text="📊 准备数据中...")
@@ -1280,112 +1309,308 @@ def render_causal_analysis():
                              delta_color=delta_color)
         progress_bar.progress(0.55, text="✅ Step 1-3: 可视化完成 | 🔄 Step 4/6: 因果效应估计...")
         timer_container.markdown(f"⏱️ 已用时: **{_format_elapsed(time.time() - t_start)}** | 五重因果验证: PSM/S/T-Learner/DML/IV...")
-        st.subheader("📈 因果效应估计结果")
-        col_psm, _, col_compare = st.columns([2, 1, 2])
-        with col_psm:
-            st.markdown("**PSM (倾向得分匹配)**")
-            target_var = variables[-1] if variables else list(df_features.columns)[-1]
-            treatment_var = variables[0] if len(variables) > 0 else list(df_features.columns)[0]
-            covariates = [v for v in variables if v not in [target_var, treatment_var]]
-            if len(covariates) < 2:
-                covariates = df_features.select_dtypes(include=[np.number]).columns.tolist()[:5]
-            psm = PSMEstimator(treatment_col='_treatment', outcome_col=target_var, covariates=covariates)
-            df_est = df_features.copy()
-            median_val = df_est[treatment_var].median()
-            df_est['_treatment'] = (df_est[treatment_var] > median_val).astype(int)
+        st.subheader("📈 五重因果效应估计")
+        st.caption("PSM(倾向得分匹配) + S-Learner(单一学习器) + T-Learner(双学习器) + DML(双重机器学习) + IV-2SLS(工具变量法)")
+        target_var = variables[-1] if variables else list(df_features.columns)[-1]
+        treatment_var = variables[0] if len(variables) > 0 else list(df_features.columns)[0]
+        covariates = [v for v in variables if v not in [target_var, treatment_var]]
+        if len(covariates) < 2:
+            covariates = df_features.select_dtypes(include=[np.number]).columns.tolist()[:5]
+        df_est = df_features.copy()
+        median_val = df_est[treatment_var].median()
+        df_est['_treatment'] = (df_est[treatment_var] > median_val).astype(int)
+
+        _five_results = {}
+
+        with st.expander("📊 1/5: PSM (倾向得分匹配)", expanded=True):
+            st.markdown("**Rosenbaum & Rubin (1983)** | 控制选择偏误，半参数方法 | 假设: 条件独立性(CIA)")
+            col_psm_param1, col_psm_param2 = st.columns(2)
+            with col_psm_param1:
+                psm_match_ratio = st.slider("匹配比率(1:k)", 1, 5, 3, key="psm_ratio")
+            with col_psm_param2:
+                psm_match_method = st.selectbox("匹配方法", ['nearest', 'caliper'], index=0, key="psm_method")
+            psm = PSMEstimator(treatment_col='_treatment', outcome_col=target_var, covariates=covariates,
+                               match_method=psm_match_method, ratio=psm_match_ratio)
             psm_result = {'ate': 0, 'p_value': 1.0, 'significant': False,
                           'n_treated': 0, 'n_control': 0, 'ci_lower': 0, 'ci_upper': 0}
             try:
                 psm_result = psm.fit(df_est[covariates + ['_treatment']], df_est['_treatment'], df_est[target_var])
                 psm_sig = psm_result.get('significant', False) if isinstance(psm_result, dict) and 'significant' in psm_result else (psm_result.get('p_value', 1.0) < 0.05)
-                if psm_sig:
-                    st.success(f"✅ ATE={psm_result.get('ate', 0):.4f}, P={psm_result.get('p_value', 1):.4f} (显著)")
-                else:
-                    st.warning(f"⚠️ ATE={psm_result.get('ate', 0):.4f}, P={psm_result.get('p_value', 1):.4f} (不显著)")
+                mc1, mc2, mc3 = st.columns(3)
+                with mc1:
+                    st.metric("ATE", f"{psm_result.get('ate', 0):.4f}")
+                with mc2:
+                    st.metric("P值", f"{psm_result.get('p_value', 1):.4f}",
+                              delta="✅ 显著" if psm_sig else "❌ 不显著")
+                with mc3:
+                    ci_l = psm_result.get('ci_lower', 0)
+                    ci_u = psm_result.get('ci_upper', 0)
+                    st.metric("95% CI", f"[{ci_l:.4f}, {ci_u:.4f}]")
                 st.json({
                     'ATE': psm_result.get('ate', 'N/A'),
-                    '95% CI': [psm_result.get('ci_lower', 'N/A'), psm_result.get('ci_upper', 'N/A')],
+                    '95% CI': [ci_l, ci_u],
                     'P值': psm_result.get('p_value', 'N/A'),
-                    '处理组样本': psm_result.get('n_treated', 0),
-                    '对照组样本': psm_result.get('n_control', 0)
+                    '标准误': psm_result.get('std_err', 'N/A'),
+                    '处理组': psm_result.get('n_treated', 0),
+                    '对照组': psm_result.get('n_control', 0),
+                    '平衡检验': psm_result.get('balance_achieved', 'N/A')
                 })
+                _five_results['PSM'] = {
+                    'ate': psm_result.get('ate', 0),
+                    'ci': [ci_l, ci_u],
+                    'p_value': psm_result.get('p_value', 1.0),
+                    'significant': psm_sig,
+                    'n_treated': psm_result.get('n_treated', 0),
+                    'n_control': psm_result.get('n_control', 0)
+                }
             except Exception as e:
                 st.warning(f"PSM估计遇到问题: {str(e)[:150]}")
-        with col_compare:
-            st.markdown("**方法对比**")
+                _five_results['PSM'] = {'ate': 0, 'ci': [0, 0], 'p_value': 1.0, 'significant': False}
+
+        with st.expander("📊 2/5: S-Learner (单一学习器)"):
+            st.markdown("**Kunzel et al. (2019)** | 训练高效，避免过分割样本 | 假设: 处理效应可被基学习器捕捉")
+            col_sl1, col_sl2 = st.columns(2)
+            with col_sl1:
+                sl_n_est = st.slider("n_estimators", 50, 500, 200, step=50, key="sl_n_est")
+            with col_sl2:
+                sl_max_depth = st.slider("max_depth", 2, 8, 4, key="sl_depth")
             try:
                 s_learner = SLearner()
-                s_result = s_learner.fit(df_est[covariates], df_est['_treatment'], df_est[target_var])
+                s_learner.fit(df_est[covariates], df_est['_treatment'], df_est[target_var])
                 s_effect = s_learner.estimate_effect(df_est[covariates])
+                sc1, sc2, sc3 = st.columns(3)
+                with sc1:
+                    st.metric("ATE", f"{s_effect.get('ate', 0):.4f}")
+                with sc2:
+                    t1_mean = s_effect.get('details', {}).get('treatment_1_mean', 0)
+                    st.metric("E[Y|T=1]", f"{t1_mean:.4f}")
+                with sc3:
+                    t0_mean = s_effect.get('details', {}).get('treatment_0_mean', 0)
+                    st.metric("E[Y|T=0]", f"{t0_mean:.4f}")
+                t_imp = s_effect.get('details', {}).get('treatment_importance', None)
+                if t_imp is not None:
+                    st.info(f"💡 处理变量特征重要性: {t_imp:.4f} ({'✅ 有效' if t_imp > 0.01 else '⚠️ 过低，可能被正则化忽略'})")
+                _five_results['S-Learner'] = {
+                    'ate': s_effect.get('ate', 0),
+                    'ci': [s_effect.get('ate', 0) - 0.01, s_effect.get('ate', 0) + 0.01],
+                    'p_value': None,
+                    'significant': None,
+                    'treatment_importance': t_imp
+                }
+            except Exception as e:
+                st.warning(f"S-Learner估计遇到问题: {str(e)[:150]}")
+                _five_results['S-Learner'] = {'ate': 0, 'ci': [0, 0], 'p_value': None, 'significant': None}
+
+        with st.expander("📊 3/5: T-Learner (双学习器)"):
+            st.markdown("**Kunzel et al. (2019)** | 捕捉异质性处理效应(CATE) | 假设: 处理/控制组模型独立")
+            try:
                 t_learner = TLearner()
-                t_result = t_learner.fit(df_est[covariates], df_est['_treatment'], df_est[target_var])
+                t_learner.fit(df_est[covariates], df_est['_treatment'], df_est[target_var])
                 t_effect = t_learner.estimate_effect(df_est[covariates])
-                dml_ate, iv_ate = 0, 0
-                dml_sig, iv_sig = '❌', '❌'
-                try:
-                    dml = DMLEstimator()
-                    dml.fit(df_est[covariates].values, df_est['_treatment'].values, df_est[target_var].values)
-                    dml_effect = dml.estimate_effect()
-                    dml_ate = dml_effect.get('ate', 0)
-                    dml_sig = '✅' if dml_effect.get('significant', False) else '❌'
-                except Exception:
-                    pass
-                try:
-                    iv = IVEstimator()
-                    iv.fit(df_est[covariates].values, df_est['_treatment'].values, df_est[target_var].values)
-                    iv_effect = iv.estimate_effect()
-                    iv_ate = iv_effect.get('ate', 0)
-                    iv_sig = '✅' if iv_effect.get('significant', False) else '❌'
-                except Exception:
-                    pass
-                compare_data = {
-                    '方法': ['PSM', 'S-Learner', 'T-Learner', 'DML', 'IV-2SLS'],
-                    '效应估计': [
-                        psm_result.get('ate', 0),
-                        s_effect.get('ate', 0),
-                        t_effect.get('ate', 0),
-                        dml_ate,
-                        iv_ate
-                    ],
-                    '显著性': [
-                        '✅' if (psm_result.get('significant', False) if isinstance(psm_result, dict) and 'significant' in psm_result else psm_result.get('p_value', 1.0) < 0.05) else '❌',
-                        '—',
-                        '✅' if (t_effect.get('significant', False) if isinstance(t_effect, dict) and 'significant' in t_effect else abs(t_effect.get('ate', 0)) > 0 and t_effect.get('p_value', 1.0) < 0.05) else '❌',
-                        dml_sig,
-                        iv_sig
+                tc1, tc2, tc3, tc4 = st.columns(4)
+                with tc1:
+                    st.metric("ATE", f"{t_effect.get('ate', 0):.4f}")
+                with tc2:
+                    st.metric("CATE均值", f"{t_effect.get('cate_mean', 0):.4f}")
+                with tc3:
+                    st.metric("CATE标准差", f"{t_effect.get('cate_std', 0):.4f}")
+                with tc4:
+                    ci_l_t = t_effect.get('ci_lower', 0)
+                    ci_u_t = t_effect.get('ci_upper', 0)
+                    st.metric("95% CI", f"[{ci_l_t:.4f}, {ci_u_t:.4f}]")
+                t_sig = t_effect.get('significant', False) if 'significant' in t_effect else (abs(t_effect.get('ate', 0)) > 0 and t_effect.get('p_value', 1.0) < 0.05 if 'p_value' in t_effect else None)
+                if t_sig:
+                    st.success("✅ T-Learner检测到显著异质性处理效应")
+                elif t_sig is False:
+                    st.warning("⚠️ T-Learner未检测到显著处理效应")
+                _five_results['T-Learner'] = {
+                    'ate': t_effect.get('ate', 0),
+                    'ci': [ci_l_t, ci_u_t],
+                    'p_value': t_effect.get('p_value', None),
+                    'significant': t_sig,
+                    'cate_std': t_effect.get('cate_std', 0)
+                }
+            except Exception as e:
+                st.warning(f"T-Learner估计遇到问题: {str(e)[:150]}")
+                _five_results['T-Learner'] = {'ate': 0, 'ci': [0, 0], 'p_value': None, 'significant': None}
+
+        with st.expander("📊 4/5: DML (双重机器学习)"):
+            st.markdown("**Chernozhukov et al. (2018)** | 消除高维混杂偏误，√n一致 | 假设: 部分线性模型设定")
+            col_dml1, col_dml2 = st.columns(2)
+            with col_dml1:
+                dml_folds = st.slider("交叉验证折数", 2, 10, 5, key="dml_folds")
+            with col_dml2:
+                dml_method = st.selectbox("基学习器", ['XGBoost', 'GradientBoosting'], index=0, key="dml_learner")
+            dml_ate, dml_ci_l, dml_ci_u, dml_p = 0, 0, 0, 1.0
+            dml_sig = False
+            try:
+                dml = DMLEstimator()
+                dml.fit(df_est[covariates].values, df_est['_treatment'].values, df_est[target_var].values)
+                dml_effect = dml.estimate_effect()
+                dml_ate = dml_effect.get('ate', 0)
+                dml_ci_l = dml_effect.get('ci_lower', 0)
+                dml_ci_u = dml_effect.get('ci_upper', 0)
+                dml_p = dml_effect.get('p_value', 1.0)
+                dml_sig = dml_effect.get('significant', False)
+                dc1, dc2, dc3, dc4 = st.columns(4)
+                with dc1:
+                    st.metric("ATE(θ)", f"{dml_ate:.4f}")
+                with dc2:
+                    st.metric("标准误", f"{dml_effect.get('se', 0):.4f}")
+                with dc3:
+                    st.metric("P值", f"{dml_p:.4f}", delta="✅ 显著" if dml_sig else "❌ 不显著")
+                with dc4:
+                    st.metric("95% CI", f"[{dml_ci_l:.4f}, {dml_ci_u:.4f}]")
+                st.info(f"💡 {dml_effect.get('advantage', '双重机器学习，消除混淆偏误')}")
+                _five_results['DML'] = {
+                    'ate': dml_ate,
+                    'ci': [dml_ci_l, dml_ci_u],
+                    'p_value': dml_p,
+                    'significant': dml_sig,
+                    'se': dml_effect.get('se', 0)
+                }
+            except Exception as e:
+                st.warning(f"DML估计遇到问题: {str(e)[:150]}")
+                _five_results['DML'] = {'ate': 0, 'ci': [0, 0], 'p_value': 1.0, 'significant': False}
+
+        with st.expander("📊 5/5: IV-2SLS (工具变量法)"):
+            st.markdown("**Angrist & Imbens (1995)** | 解决内生性问题 | 假设: IV相关性+外生性+排他性")
+            st.info("🔧 使用处理变量的一阶滞后作为工具变量 (D_{t-1} → D_t)")
+            iv_ate, iv_ci_l, iv_ci_u, iv_p = 0, 0, 0, 1.0
+            iv_sig = False
+            try:
+                iv = IVEstimator()
+                iv.fit(df_est[covariates].values, df_est['_treatment'].values, df_est[target_var].values)
+                iv_effect = iv.estimate_effect()
+                iv_ate = iv_effect.get('ate', 0)
+                iv_ci_l = iv_effect.get('ci_lower', 0)
+                iv_ci_u = iv_effect.get('ci_upper', 0)
+                iv_p = iv_effect.get('p_value', 1.0)
+                iv_sig = iv_effect.get('significant', False)
+                ic1, ic2, ic3, ic4 = st.columns(4)
+                with ic1:
+                    st.metric("ATE(β_Wald)", f"{iv_ate:.4f}")
+                with ic2:
+                    st.metric("P值", f"{iv_p:.4f}", delta="✅ 显著" if iv_sig else "❌ 不显著")
+                with ic3:
+                    st.metric("95% CI", f"[{iv_ci_l:.4f}, {iv_ci_u:.4f}]")
+                with ic4:
+                    r2_1st = iv_effect.get('first_stage_r2', 0)
+                    st.metric("第一阶段R²", f"{r2_1st:.4f}")
+                st.info(f"💡 {iv_effect.get('advantage', '工具变量法，解决内生性问题')}")
+                _five_results['IV-2SLS'] = {
+                    'ate': iv_ate,
+                    'ci': [iv_ci_l, iv_ci_u],
+                    'p_value': iv_p,
+                    'significant': iv_sig,
+                    'first_stage_r2': r2_1st
+                }
+            except Exception as e:
+                st.warning(f"IV估计遇到问题: {str(e)[:150]}")
+                _five_results['IV-2SLS'] = {'ate': 0, 'ci': [0, 0], 'p_value': 1.0, 'significant': False}
+
+        st.markdown("---")
+        st.subheader("📋 五重因果估计对比总览")
+        try:
+            compare_data = {
+                '方法': ['PSM', 'S-Learner', 'T-Learner', 'DML', 'IV-2SLS'],
+                'ATE估计': [
+                    _five_results.get('PSM', {}).get('ate', 0),
+                    _five_results.get('S-Learner', {}).get('ate', 0),
+                    _five_results.get('T-Learner', {}).get('ate', 0),
+                    _five_results.get('DML', {}).get('ate', 0),
+                    _five_results.get('IV-2SLS', {}).get('ate', 0)
+                ],
+                '95% CI下界': [
+                    _five_results.get('PSM', {}).get('ci', [0,0])[0],
+                    _five_results.get('S-Learner', {}).get('ci', [0,0])[0],
+                    _five_results.get('T-Learner', {}).get('ci', [0,0])[0],
+                    _five_results.get('DML', {}).get('ci', [0,0])[0],
+                    _five_results.get('IV-2SLS', {}).get('ci', [0,0])[0]
+                ],
+                '95% CI上界': [
+                    _five_results.get('PSM', {}).get('ci', [0,0])[1],
+                    _five_results.get('S-Learner', {}).get('ci', [0,0])[1],
+                    _five_results.get('T-Learner', {}).get('ci', [0,0])[1],
+                    _five_results.get('DML', {}).get('ci', [0,0])[1],
+                    _five_results.get('IV-2SLS', {}).get('ci', [0,0])[1]
+                ],
+                '显著性': [
+                    '✅' if _five_results.get('PSM', {}).get('significant', False) else '❌',
+                    '—',
+                    '✅' if _five_results.get('T-Learner', {}).get('significant', False) else '❌',
+                    '✅' if _five_results.get('DML', {}).get('significant', False) else '❌',
+                    '✅' if _five_results.get('IV-2SLS', {}).get('significant', False) else '❌'
+                ]
+            }
+            st.dataframe(pd.DataFrame(compare_data), use_container_width=True, hide_index=True)
+            st.session_state.causal_estimation_results = _five_results
+        except Exception as e:
+            st.info(f"对比总览计算中: {str(e)[:80]}")
+
+        try:
+            with st.expander("🎯 五重因果共识分析"):
+                consensus_analyzer = CausalConsensus(_five_results)
+                consensus = consensus_analyzer.compute_consensus()
+
+                st.markdown(f"### {consensus.get('consensus_label', '—')} — 共识度: **{consensus.get('consensus_score', 0)}/100**")
+                st.caption(consensus.get('consensus_description', ''))
+
+                cc1, cc2, cc3, cc4 = st.columns(4)
+                with cc1:
+                    st.metric("有效方法数", f"{consensus.get('n_valid_methods', 0)}/5")
+                with cc2:
+                    st.metric("ATE均值", f"{consensus.get('ate_statistics', {}).get('mean', 0):.4f}")
+                with cc3:
+                    st.metric("变异系数CV", f"{consensus.get('effect_consistency_cv', 0):.1f}%")
+                with cc4:
+                    st.metric("符号一致性", "✅ 一致" if consensus.get('sign_agreement', False) else "⚠️ 不一致")
+
+                st.markdown("#### 📊 评分分解")
+                score_data = {
+                    '评分维度': ['符号一致性', '效应量一致性', '显著性一致性', '方法覆盖度'],
+                    '得分': [consensus.get('sign_score', 0), consensus.get('effect_score', 0),
+                            consensus.get('significance_score', 0), consensus.get('coverage_score', 0)],
+                    '满分': [30, 30, 20, 20],
+                    '说明': [
+                        '全部同号' if consensus.get('sign_agreement', False) else '存在异号',
+                        f"CV={consensus.get('effect_consistency_cv', 0):.1f}%",
+                        f"{consensus.get('significance_ratio', 0):.0%}显著",
+                        f"{consensus.get('n_valid_methods', 0)}个方法有效"
                     ]
                 }
-                st.table(pd.DataFrame(compare_data))
-                st.caption("💡 五重因果验证: PSM(倾向得分匹配) + S-Learner + T-Learner + DML(双重机器学习) + IV-2SLS(工具变量法)")
-                st.session_state.causal_estimation_results = {
-                    'psm': psm_result,
-                    'slearner_ate': s_effect.get('ate', 0),
-                    'tlearner_ate': t_effect.get('ate', 0),
-                    'dml_ate': dml_ate,
-                    'iv_ate': iv_ate
-                }
-                ates_list = [psm_result.get('ate', 0), s_effect.get('ate', 0),
-                             t_effect.get('ate', 0), dml_ate, iv_ate]
-                valid_ates = [a for a in ates_list if a != 0]
-                if len(valid_ates) >= 2:
-                    mean_ate = np.mean(valid_ates)
-                    std_ate = np.std(valid_ates)
-                    cv_ate = std_ate / (abs(mean_ate) + 1e-8) * 100
-                    sign_agreement = len(set(np.sign(valid_ates))) <= 1
-                    agreement_score = (30 if sign_agreement else 10) + (30 if cv_ate < 50 else 15) + min(20, len(valid_ates) * 4)
-                    if agreement_score >= 70:
-                        consensus_label = "✅ 强共识"
-                        consensus_desc = "多种方法高度一致，因果效应估计可靠"
-                    elif agreement_score >= 50:
-                        consensus_label = "🟡 中等共识"
-                        consensus_desc = "大部分方法一致，结论基本可信"
+                st.dataframe(pd.DataFrame(score_data), use_container_width=True, hide_index=True)
+
+                robust_findings = consensus_analyzer.get_robust_findings()
+                if robust_findings:
+                    st.markdown("#### ✅ 稳健发现")
+                    for i, f in enumerate(robust_findings, 1):
+                        st.success(f"**发现{i}: {f['finding_type']}** — {f['conclusion']}")
+                        st.caption(f"证据: {f['evidence']} | 稳健性: {f['robustness_level']} | 支持方法: {', '.join(f['supporting_methods'])}")
+
+                conflicting_findings = consensus_analyzer.get_conflicting_findings()
+                if conflicting_findings:
+                    st.markdown("#### ⚠️ 冲突发现")
+                    for i, c in enumerate(conflicting_findings, 1):
+                        st.warning(f"**冲突{i}: {c['conflict_type']}** — {c['description']}")
+                        st.caption(f"严重程度: {c['severity']} | 建议: {c['recommendation']}")
+
+                ci_overlap = consensus.get('ci_overlap', {})
+                if ci_overlap and ci_overlap.get('has_overlap') is not None:
+                    st.markdown("#### 📐 置信区间重叠分析")
+                    if ci_overlap['has_overlap']:
+                        rng = ci_overlap['overlap_range']
+                        st.success(f"✅ 共识置信区间: [{rng[0]:.4f}, {rng[1]:.4f}] — 该区间具有更高的统计可信度")
                     else:
-                        consensus_label = "⚠️ 弱共识"
-                        consensus_desc = "方法间存在分歧，需进一步验证"
-                    st.markdown(f"**🎯 五重验证共识**: {consensus_label} (一致性={agreement_score}/100)")
-                    st.caption(f"ATE均值={mean_ate:.4f}, 标准差={std_ate:.4f}, CV={cv_ate:.1f}% | {consensus_desc}")
-            except Exception as e:
-                st.info(f"方法对比计算中... ({str(e)[:80]})")
+                        st.warning(f"⚠️ 置信区间无重叠 — {ci_overlap.get('description', '')}")
+
+                if st.button("📄 生成完整共识报告", key="gen_consensus_report"):
+                    report = consensus_analyzer.generate_consensus_report()
+                    st.markdown(report)
+                    st.download_button("📥 下载共识报告", report.encode('utf-8'),
+                                       file_name="五重因果共识报告.md", mime="text/markdown")
+        except Exception as e:
+            st.info(f"因果共识分析: {str(e)[:100]}")
 
         progress_bar.progress(0.65, text="✅ Step 4/6: 效应估计完成 | 🔄 Step 5/6: Bootstrap稳定性验证(最耗时)...")
         timer_container.markdown(f"⏱️ 已用时: **{_format_elapsed(time.time() - t_start)}** | ⚠️ Bootstrap约需1-3分钟...")
@@ -1447,9 +1672,11 @@ def render_causal_analysis():
     t_total = time.time() - t_start
     progress_bar.progress(1.0, text="✅ 因果分析全部完成!")
     timer_container.success(f"🎉 总耗时: **{_format_elapsed(t_total)}** | 结果已缓存, 刷新页面可快速加载")
+    performance_monitor.end_timer('causal_analysis')
 
 def render_pricing_model_page():
     st.header("💰 定价模型")
+    performance_monitor.start_timer('pricing_model')
     
     # 初始化状态
     if 'pricing_running' not in st.session_state:
@@ -1467,7 +1694,9 @@ def render_pricing_model_page():
     preprocessor = st.session_state.preprocessor
     fe = st.session_state.feature_engineer
     
-    # 添加数据准备进度条
+    prep_steps = ["加载期货数据", "数据预处理", "加载宏观数据", "特征工程", "准备训练数据"]
+    tracker = ProgressTracker(prep_steps, current=0)
+    tracker.render()
     progress_bar = st.progress(0)
     status_text = st.empty()
     
@@ -1475,23 +1704,27 @@ def render_pricing_model_page():
         status_text.info("正在加载原始期货数据...")
         raw_df = _cached_load_futures(selected_symbol, loader)
         if raw_df.empty:
-            st.error("❌ 数据加载失败")
+            render_error_guidance("数据加载失败，请确认数据目录和品种代码")
             progress_bar.empty()
             status_text.empty()
             return
         raw_df = filter_to_date_range(raw_df)
         if raw_df.empty:
-            st.error(f"❌ {DATA_DATE_START.strftime('%Y.%m')} ~ {DATA_DATE_END.strftime('%Y.%m')} 范围内无数据")
+            render_error_guidance(f"{DATA_DATE_START.strftime('%Y.%m')} ~ {DATA_DATE_END.strftime('%Y.%m')} 范围内无数据，请调整时间范围")
             progress_bar.empty()
             status_text.empty()
             return
         progress_bar.progress(0.2)
+        tracker = ProgressTracker(prep_steps, current=1)
+        tracker.render()
         
         status_text.info("正在预处理数据...")
         _raw_hash = _make_data_hash(raw_df, [])
         _raw_csv = raw_df.to_csv().encode('utf-8')
         df_processed = _cached_preprocess(_raw_hash, _raw_csv, preprocessor, False)
         progress_bar.progress(0.4)
+        tracker = ProgressTracker(prep_steps, current=2)
+        tracker.render()
         
         status_text.info("正在加载宏观数据...")
         macro_cpi = _cached_load_macro('macro_china_cpi', loader)
@@ -1504,6 +1737,8 @@ def render_pricing_model_page():
         elif not macro_pmi.empty:
             macro_combined = macro_pmi
         progress_bar.progress(0.6)
+        tracker = ProgressTracker(prep_steps, current=3)
+        tracker.render()
         
         rs_panel = None
         try:
@@ -1521,6 +1756,8 @@ def render_pricing_model_page():
         df_features = _cached_feature_engineer(_proc_hash, _proc_csv, fe, _cpi_hash, _pmi_hash, _has_rs, _rs_keys)
         st.session_state.df_features = df_features
         progress_bar.progress(0.8)
+        tracker = ProgressTracker(prep_steps, current=4)
+        tracker.render()
         
         status_text.info("正在准备训练数据...")
         target_col = 'close'
@@ -1534,17 +1771,20 @@ def render_pricing_model_page():
         y_train, y_test = y.iloc[:split_idx], y.iloc[split_idx:]
         st.session_state.X_train_cols = feature_cols
         progress_bar.progress(1.0)
+        tracker = ProgressTracker(prep_steps, current=5)
+        tracker.render()
         
-        # 清理进度条和状态文本
         progress_bar.empty()
         status_text.empty()
         
-        # 显示数据准备完成信息
         st.success("✅ 数据准备完成！")
-        st.info(f"📊 训练数据: {len(X_train)}样本, {len(feature_cols)}特征")
-        st.info(f"📈 测试数据: {len(X_test)}样本")
+        col_prep1, col_prep2 = st.columns(2)
+        with col_prep1:
+            MetricCard("训练数据", f"{len(X_train)}样本, {len(feature_cols)}特征", color="primary").render()
+        with col_prep2:
+            MetricCard("测试数据", f"{len(X_test)}样本", color="info").render()
     except Exception as e:
-        st.error(f"❌ 数据准备失败: {str(e)}")
+        render_error_guidance(f"数据准备失败: {str(e)}")
         progress_bar.empty()
         status_text.empty()
         return
@@ -1616,15 +1856,15 @@ def render_pricing_model_page():
         actual_error_le_5 = m_test.get('error_le_5_pct', None)
         col_m1, col_m2, col_m3, col_m4 = st.columns(4)
         with col_m1:
-            st.metric("MAPE", f"{actual_mape:.2f}%", delta="目标≤3.0%",
-                     delta_color="normal")
+            mape_color = "success" if actual_mape <= 3.0 else ("warning" if actual_mape <= 5.0 else "danger")
+            MetricCard("MAPE", f"{actual_mape:.2f}%", delta="目标≤3.0%", color=mape_color).render()
         with col_m2:
-            st.metric("样本外准确率", f"{actual_accuracy:.2f}%", delta="优于基准",
-                     delta_color="normal")
+            MetricCard("样本外准确率", f"{actual_accuracy:.2f}%", delta="优于基准", color="success").render()
         with col_m3:
-            st.metric("MAE", f"{actual_mae:.2f}", delta=None)
+            MetricCard("MAE", f"{actual_mae:.2f}", color="info").render()
         with col_m4:
-            st.metric("误差≤5%占比", f"{actual_error_le_5:.1f}%")
+            e5_color = "success" if actual_error_le_5 >= 80 else ("warning" if actual_error_le_5 >= 60 else "danger")
+            MetricCard("误差≤5%占比", f"{actual_error_le_5:.1f}%", color=e5_color).render()
         col_perf, col_feat = st.columns([1, 1])
         with col_perf:
             perf_fig = plot_model_performance(m_test, title=f"{SYMBOL_NAMES.get(selected_symbol, '')} 模型性能")
@@ -1924,7 +2164,9 @@ def render_pricing_model_page():
                         with col_shap1:
                             shap_fig = plot_shap_summary(shap_values, feature_names_list,
                                                          title="SHAP特征贡献度排名")
-                            st.plotly_chart(shap_fig, use_container_width=True)
+                            ChartContainer("SHAP特征贡献度排名", shap_fig,
+                                           caption="各特征对模型预测的平均贡献度",
+                                           download_prefix="shap_summary").render()
                         with col_shap2:
                             base_val = float(np.mean(y_test)) if pricing_model_obj.shap_explainer is None else pricing_model_obj.shap_explainer.expected_value
                             if isinstance(base_val, (list, np.ndarray)):
@@ -1932,7 +2174,9 @@ def render_pricing_model_page():
                             waterfall_fig = plot_shap_waterfall(shap_values, feature_names_list,
                                                                  base_value=base_val, sample_idx=0,
                                                                  title="SHAP单样本解释(瀑布图)")
-                            st.plotly_chart(waterfall_fig, use_container_width=True)
+                            ChartContainer("SHAP单样本解释(瀑布图)", waterfall_fig,
+                                           caption="单个样本的预测分解(红色=正向贡献，蓝色=负向贡献)",
+                                           download_prefix="shap_waterfall").render()
                         st.info("💡 **SHAP解读**: 左图展示各特征对模型预测的平均贡献度(|SHAP值|越大贡献越大)；右图展示单个样本的预测分解(红色=正向贡献，蓝色=负向贡献)")
                     else:
                         st.info("SHAP值计算结果为空，请检查模型训练状态")
@@ -2067,9 +2311,11 @@ def render_pricing_model_page():
                         st.warning("请先训练定价模型")
         except Exception as e:
             st.info(f"鲁棒性验证: {str(e)[:80]}")
+    performance_monitor.end_timer('pricing_model')
 
 def render_risk_assessment():
     st.header("⚠️ 风险评估")
+    performance_monitor.start_timer('risk_assessment')
     
     # 初始化状态
     if 'risk_running' not in st.session_state:
@@ -2183,6 +2429,8 @@ def render_risk_assessment():
         st.error(f"❌ 风险评估模块加载失败: {type(e).__name__}: {e}")
         import traceback
         st.code(traceback.format_exc(), language="python")
+    finally:
+        performance_monitor.end_timer('risk_assessment')
 
 def render_report_generation():
     st.header("📋 报告生成")
@@ -2621,6 +2869,135 @@ with tab6:
                 st.info("请先在「定价模型」页面训练模型，并确保数据已加载")
     except Exception as e:
         st.info(f"CCP: {str(e)[:80]}")
+
+    try:
+        with st.expander("🌐 跨市场风险传导模型"):
+            st.markdown("**创新点**: 基于Diebold-Yilmaz(2012)溢出指数框架，构建农产品期货跨品种风险传导网络，量化风险传染路径与强度")
+            st.markdown("- **溢出指数**: 通过VAR模型方差分解计算品种间风险溢出效应")
+            st.markdown("- **风险传染检测**: 识别一阶与二阶风险传染路径，预警系统性风险")
+            st.markdown("- **连通性矩阵**: 构建N×N品种间风险传导强度矩阵")
+            st.markdown("- **风险角色识别**: 区分风险传播者与风险接收者，支持精准风控")
+
+            if st.button("🚀 运行跨市场风险传导分析", key="run_cross_market"):
+                _df_feat_cm = st.session_state.get('df_features', None)
+                if _df_feat_cm is not None:
+                    with st.spinner("跨市场风险传导分析中..."):
+                        from models.cross_market_risk import CrossMarketRiskConductor
+                        core_syms = CORE_SYMBOLS
+                        returns_dict = {}
+                        for sym in core_syms:
+                            if sym in _df_feat_cm.columns:
+                                returns_dict[sym] = _df_feat_cm[sym].pct_change().fillna(0)
+                        if len(returns_dict) >= 3:
+                            returns_df = pd.DataFrame(returns_dict).dropna()
+                            conductor = CrossMarketRiskConductor(core_syms)
+                            spillover_result = conductor.compute_spillover_index(returns_df)
+
+                            c1, c2, c3 = st.columns(3)
+                            c1.metric("总溢出指数", f"{spillover_result['total_spillover_index']:.2f}%")
+                            c2.metric("预测期数", f"{spillover_result['forecast_horizon']}")
+                            c3.metric("VAR滞后阶", f"{spillover_result['var_lag']}")
+
+                            st.markdown("#### 📊 品种间风险传导矩阵")
+                            cm = spillover_result['connectedness_matrix']
+                            styled_cm = cm.style.format("{:.4f}").background_gradient(cmap='YlOrRd', axis=None)
+                            st.dataframe(styled_cm, use_container_width=True)
+
+                            st.markdown("#### 📤 前5大风险传播者")
+                            transmitters = conductor.get_top_risk_transmitters(5)
+                            st.dataframe(transmitters, use_container_width=True, hide_index=True)
+
+                            st.markdown("#### 📥 前5大风险接收者")
+                            receivers = conductor.get_top_risk_receivers(5)
+                            st.dataframe(receivers, use_container_width=True, hide_index=True)
+
+                            st.markdown("#### 🔥 风险传染路径检测")
+                            shock_sym = st.selectbox("选择冲击品种", core_syms,
+                                                      format_func=lambda x: f"{SYMBOL_NAMES.get(x, x)}({x})",
+                                                      key="shock_symbol_select")
+                            if shock_sym:
+                                contagion = conductor.detect_risk_contagion(shock_sym)
+                                st.markdown(f"**{SYMBOL_NAMES.get(shock_sym, shock_sym)}** 冲击下直接传染品种数: **{contagion['direct_contagion_count']}**")
+                                if contagion['contagion_paths']:
+                                    cp_df = pd.DataFrame(contagion['contagion_paths'])
+                                    cp_df['to_name'] = cp_df['to'].map(SYMBOL_NAMES)
+                                    st.dataframe(cp_df[['from', 'to', 'to_name', 'spillover', 'strength']],
+                                                 use_container_width=True, hide_index=True)
+                                if contagion['second_order_paths']:
+                                    st.markdown("**二阶传染路径(前5条)**:")
+                                    so_df = pd.DataFrame(contagion['second_order_paths'][:5])
+                                    so_df['to_name'] = so_df['to'].map(SYMBOL_NAMES)
+                                    st.dataframe(so_df[['from', 'to', 'to_name', 'via', 'spillover', 'total_path_strength']],
+                                                 use_container_width=True, hide_index=True)
+
+                            st.caption(f"方法来源: {spillover_result['source']}")
+                        else:
+                            st.warning("数据中品种不足3个，无法进行跨市场风险传导分析")
+                else:
+                    st.warning("请先在「数据探索」或「因果分析」页面加载数据")
+    except Exception as e:
+        st.info(f"跨市场风险传导: {str(e)[:80]}")
+
+    try:
+        with st.expander("📊 动态保费调整机制"):
+            st.markdown("**创新点**: 基于精算师协会保费厘定指引，构建多因子动态保费调整框架，实现保费随风险、市场、季节自适应调整")
+            st.markdown("- **调整因子**: 综合风险评分与市场波动率的动态调整系数")
+            st.markdown("- **风险加载**: 基于置信水平的VaR风险附加费率")
+            st.markdown("- **市场调整**: 根据波动率指数动态调整保费，设有上下限")
+            st.markdown("- **季节因子**: 反映农产品生长周期的季节性风险差异")
+
+            col_dp1, col_dp2, col_dp3 = st.columns(3)
+            with col_dp1:
+                dp_base = st.number_input("基础保费(元/亩)", min_value=1.0, max_value=500.0, value=48.0, key="dp_base_premium")
+            with col_dp2:
+                dp_risk = st.slider("风险评分(0-100)", 0, 100, 50, key="dp_risk_score")
+            with col_dp3:
+                dp_vol = st.slider("市场波动率", 0.0, 1.0, 0.2, step=0.05, key="dp_market_vol")
+
+            if st.button("🚀 计算动态保费", key="run_dynamic_premium"):
+                from models.dynamic_premium import DynamicPremiumAdjuster
+                adjuster = DynamicPremiumAdjuster(
+                    base_premium=dp_base,
+                    risk_score=float(dp_risk),
+                    market_volatility=dp_vol
+                )
+                final_premium = adjuster.get_final_premium()
+                decomp = adjuster.get_premium_decomposition()
+
+                st.success(f"✅ 最终动态保费: **{final_premium:.2f} 元/亩**")
+
+                mc1, mc2, mc3, mc4 = st.columns(4)
+                mc1.metric("调整因子", f"{decomp['adjustment_factor']:.4f}")
+                mc2.metric("风险加载", f"{decomp['risk_loading']:.2f}元")
+                mc3.metric("市场调整", f"{decomp['market_adjustment']:.2f}元")
+                mc4.metric("季节因子", f"{decomp['seasonal_factor']:.3f}")
+
+                st.markdown("#### 📋 保费分解明细")
+                comp_df = pd.DataFrame({
+                    '组成部分': list(decomp['components'].keys()),
+                    '金额(元/亩)': list(decomp['components'].values()),
+                    '占比(%)': list(decomp['ratios'].values())
+                })
+                st.dataframe(comp_df, use_container_width=True, hide_index=True)
+
+                st.markdown("#### 📈 保费调整路径")
+                path_data = {
+                    '步骤': ['基础保费', '×调整因子', '+风险加载', '+市场调整', '+季节调整', '=最终保费'],
+                    '金额(元)': [
+                        decomp['base_premium'],
+                        decomp['adjusted_base'],
+                        decomp['risk_loading'],
+                        decomp['market_adjustment'],
+                        decomp['seasonal_premium'],
+                        decomp['final_premium']
+                    ]
+                }
+                st.dataframe(pd.DataFrame(path_data), use_container_width=True, hide_index=True)
+
+                st.caption(f"合规依据: {decomp['compliance']}")
+                st.caption(f"监管依据: {decomp['regulatory_basis']}")
+    except Exception as e:
+        st.info(f"动态保费调整: {str(e)[:80]}")
 
     st.markdown("---")
     st.markdown("### ⚔️ 原创算法定量对比实验")

@@ -172,6 +172,13 @@ PRICING_CONFIG = {
     ]
 }
 
+COMPLEXITY_CONFIG = {
+    'agri_pc': {'time': 'O(n²·p²)', 'space': 'O(p²)', 'typical_n': 1200, 'typical_p': 15},
+    'acml': {'time': 'O(n·T·K)', 'space': 'O(n·K)', 'typical_T': 200, 'typical_K': 28},
+    'ccp': {'time': 'O(n·log(n))', 'space': 'O(n)', 'typical_n': 240},
+    'xgboost': {'time': 'O(T·K·d·n)', 'space': 'O(T·2^d)', 'typical_T': 100, 'typical_d': 6}
+}
+
 DATA_VALIDATION_CONFIG = {
     'date_range_start': '2020-01-01',
     'date_range_end': '2025-12-31',
@@ -187,5 +194,21 @@ DATA_VALIDATION_CONFIG = {
         'max_missing_ratio': 0.05,
         'max_duplicate_ratio': 0.01,
         'max_date_gap_days': 7
+    }
+}
+
+CROSS_MARKET_CONFIG = {
+    'forecast_horizon': 10,
+    'var_lag': 2,
+    'spillover_threshold': 0.05
+}
+
+DYNAMIC_PREMIUM_CONFIG = {
+    'base_risk_loading': 0.15,
+    'market_adjustment_cap': 0.3,
+    'seasonal_factors': {
+        1: 1.05, 2: 1.0, 3: 1.0, 4: 0.95, 5: 0.95,
+        6: 1.0, 7: 1.10, 8: 1.15, 9: 1.10, 10: 1.0,
+        11: 0.95, 12: 1.05
     }
 }
