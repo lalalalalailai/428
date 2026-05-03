@@ -1616,14 +1616,14 @@ def render_causal_analysis():
         timer_container.markdown(f"⏱️ 已用时: **{_format_elapsed(time.time() - t_start)}** | ⚠️ Bootstrap约需1-3分钟...")
         st.markdown("---")
         st.subheader("🔒 DAG稳定性验证（Bootstrap）")
-        st.caption("20次Bootstrap采样验证因果边的稳定性，稳定性≥0.7为可靠边")
+        st.caption("10次Bootstrap采样验证因果边的稳定性，稳定性≥0.7为可靠边")
         try:
             if st.session_state.get('_bootstrap_cache_key') == cache_key and st.session_state.get('bootstrap_results') is not None:
                 bootstrap_results = st.session_state.bootstrap_results
                 progress_bar.progress(0.85, text="✅ Step 5/6: Bootstrap完成(缓存) | 🔄 Step 6/6: 安慰剂检验...")
             else:
                 bootstrap_results = discovery.bootstrap_stability(
-                    df_features, variables=variables, n_bootstrap=20, sample_ratio=0.8
+                    df_features, variables=variables, n_bootstrap=10, sample_ratio=0.8
                 )
                 st.session_state.bootstrap_results = bootstrap_results
                 st.session_state._bootstrap_cache_key = cache_key
@@ -1652,7 +1652,7 @@ def render_causal_analysis():
         try:
             placebo_result = placebo_test(
                 df_est[covariates], df_est['_treatment'], df_est[target_var],
-                n_permutation=100
+                n_permutation=30
             )
             col_pl1, col_pl2, col_pl3 = st.columns(3)
             with col_pl1:

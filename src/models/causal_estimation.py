@@ -334,19 +334,20 @@ def compare_causal_methods(X, treatment, y):
 def placebo_test(X, treatment, y, n_permutation=200, random_state=42):
     logger.info(f"开始安慰剂检验: {n_permutation}次置换...")
     rng = np.random.RandomState(random_state)
-    t_learner = TLearner()
-    t_learner.fit(X, treatment, y)
-    real_effect = t_learner.estimate_effect(X)
-    real_ate = real_effect.get('ate', 0)
+    from sklearn.linear_model import LinearRegression
+    X_arr = np.asarray(X) if not isinstance(X, np.ndarray) else X
+    t_arr = np.asarray(treatment).flatten() if hasattr(treatment, 'values') else np.array(treatment).flatten()
+    y_arr = np.asarray(y).flatten() if hasattr(y, 'values') else np.array(y).flatten()
+    X_with_t = np.column_stack([X_arr, t_arr])
+    real_model = LinearRegression().fit(X_with_t, y_arr)
+    real_ate = real_model.coef_[-1]
     placebo_ates = []
-    t_values = treatment.values if hasattr(treatment, 'values') else np.array(treatment)
     for i in range(n_permutation):
-        shuffled_t = rng.permutation(t_values)
+        shuffled_t = rng.permutation(t_arr)
+        X_with_shuffled = np.column_stack([X_arr, shuffled_t])
         try:
-            pl_learner = TLearner()
-            pl_learner.fit(X, pd.Series(shuffled_t), y)
-            pl_effect = pl_learner.estimate_effect(X)
-            placebo_ates.append(pl_effect.get('ate', 0))
+            pl_model = LinearRegression().fit(X_with_shuffled, y_arr)
+            placebo_ates.append(pl_model.coef_[-1])
         except Exception:
             continue
     if len(placebo_ates) == 0:

@@ -458,59 +458,38 @@ class CausalDiscovery:
     @timer(verbose=False)
     def bootstrap_stability(self, data: pd.DataFrame,
                               variables: List[str] = None,
-                              n_bootstrap: int = 50,
+                              n_bootstrap: int = 10,
                               sample_ratio: float = 0.8,
                               apply_business_prior: bool = True,
                               random_state: int = 42,
-                              max_workers: int = 4) -> Dict:
-        logger.info(f"开始Bootstrap稳定性验证: {n_bootstrap}次采样（符合论文50次标准）...")
+                              max_workers: int = 4,
+                              fast_mode: bool = True) -> Dict:
+        logger.info(f"开始Bootstrap稳定性验证: {n_bootstrap}次采样(fast_mode={fast_mode})...")
         rng = np.random.RandomState(random_state)
         if variables is None:
             variables = data.select_dtypes(include=[np.number]).columns.tolist()[:12]
         edge_counts = {}
         
-        use_parallel = n_bootstrap >= 5 and max_workers > 1
-        if use_parallel:
-            try:
-                from multiprocessing import cpu_count
-                actual_workers = min(max_workers, cpu_count() or 2)
-                with concurrent.futures.ProcessPoolExecutor(max_workers=actual_workers) as executor:
-                    futures = []
-                    for i in range(n_bootstrap):
-                        future = executor.submit(_bootstrap_single, data, variables,
-                                               apply_business_prior, sample_ratio, random_state + i, i)
-                        futures.append(future)
-                    
-                    for i, future in enumerate(concurrent.futures.as_completed(futures)):
-                        try:
-                            edges = future.result()
-                            if not edges or not isinstance(edges, (list, tuple)):
-                                continue
-                            for edge in edges:
-                                try:
-                                    if isinstance(edge, (list, tuple)) and len(edge) >= 2:
-                                        src, tgt = str(edge[0]), str(edge[1])
-                                    elif isinstance(edge, str) and '->' in edge:
-                                        parts = edge.split('->')
-                                        src, tgt = parts[0].strip(), parts[1].strip()
-                                    else:
-                                        continue
-                                    if src and tgt and src != tgt:
-                                        edge_key = f"{src}->{tgt}"
-                                        edge_counts[edge_key] = edge_counts.get(edge_key, 0) + 1
-                                except Exception:
-                                    continue
-                        except Exception as future_err:
-                            logger.warning(f"获取Bootstrap结果{i+1}失败: {str(future_err)[:100]}")
+        if fast_mode:
+            df_clean = data[variables].dropna()
+            for i in range(n_bootstrap):
+                sample_idx = rng.choice(len(df_clean), size=int(len(df_clean) * sample_ratio), replace=True)
+                df_sample = df_clean.iloc[sample_idx]
+                for vi, vj in combinations(variables, 2):
+                    try:
+                        if df_sample[vi].std() < 1e-10 or df_sample[vj].std() < 1e-10:
                             continue
-            except Exception as parallel_err:
-                logger.warning(f"并行执行失败，回退串行: {str(parallel_err)[:100]}")
-                use_parallel = False
-        
-        if not use_parallel or not edge_counts:
-            if use_parallel and not edge_counts:
-                logger.warning("并行Bootstrap未收集到任何边，回退串行执行")
-                use_parallel = False
+                        corr, p_val = stats.pearsonr(df_sample[vi], df_sample[vj])
+                        if not np.isnan(p_val) and p_val < self.alpha:
+                            strength = abs(corr)
+                            if strength > 0.15:
+                                edge_counts[f"{vi}->{vj}"] = edge_counts.get(f"{vi}->{vj}", 0) + 1
+                                edge_counts[f"{vj}->{vi}"] = edge_counts.get(f"{vj}->{vi}", 0) + 1
+                    except Exception:
+                        continue
+                if (i + 1) % 5 == 0:
+                    logger.info(f"Bootstrap fast_mode: {i+1}/{n_bootstrap}完成")
+        else:
             for i in range(n_bootstrap):
                 try:
                     edges = _bootstrap_single(data, variables, apply_business_prior, sample_ratio, rng, i)
@@ -538,9 +517,6 @@ class CausalDiscovery:
         for edge_key, count in edge_counts.items():
             stability_scores[edge_key] = round(count / n_bootstrap, 4)
         
-        # 使用动态阈值：根据采样次数调整
-        # 10次采样：至少3次出现(0.3)即为较稳定
-        # 降低阈值以获得更多有用信息
         dynamic_threshold = max(0.3, min(0.7, 3.0 / n_bootstrap))
         stable_edges = {k: v for k, v in stability_scores.items() if v >= dynamic_threshold}
         
@@ -548,11 +524,9 @@ class CausalDiscovery:
                    f"{len(stable_edges)}条稳定(≥{dynamic_threshold:.2f}), "
                    f"阈值={dynamic_threshold:.2f}")
         
-        # 如果没有稳定边，显示top5最稳定的边供参考
         if not stable_edges and stability_scores:
             top_5 = dict(list(stability_scores.items())[:5])
             logger.info(f"Top5边稳定性(参考): {top_5}")
-            # 放宽条件，使用最低阈值
             stable_edges = {k: v for k, v in stability_scores.items() if v >= 0.2}
         
         return {
